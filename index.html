@@ -3,242 +3,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat 💬</title>
+    <title>Super Chat 🚀</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* General Styles */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f0f2f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
+        /* Set font and ensure full-height view */
+        body { font-family: 'Inter', sans-serif; }
+        /* Scrollbar styling for a cleaner look */
+        #messages::-webkit-scrollbar { width: 6px; }
+        #messages::-webkit-scrollbar-thumb { background-color: #9ca3af; border-radius: 3px; }
+        #messages::-webkit-scrollbar-track { background-color: #f3f4f6; }
+        .ban-icon, .delete-icon { transition: opacity 0.2s; }
+        .message-item:hover .admin-actions { opacity: 1; }
+        .admin-actions { opacity: 0; transition: opacity 0.2s; }
+        /* Full screen overlay for mobile layout */
+        @media (max-width: 768px) {
+            #sidebar {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 20;
+            }
         }
-
-        #chat-container {
-            width: 100%;
-            max-width: 450px;
-            background-color: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            max-height: 90vh;
-        }
-
-        h1 {
-            background-color: #007bff;
-            color: white;
-            padding: 15px;
-            margin: 0;
-            font-size: 1.5em;
-            text-align: center;
-        }
-
-        /* Authentication and Admin Panels */
-        #auth-panel {
-            padding: 15px;
-            text-align: center;
-            border-bottom: 1px solid #eee;
-        }
-
-        #auth-panel input {
-            display: block;
-            width: calc(100% - 20px);
-            padding: 10px;
-            margin: 8px auto;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-
-        #auth-panel button {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 20px;
-            cursor: pointer;
-            margin: 5px;
-            font-weight: 500;
-        }
-        
-        #register-button {
-            background-color: #007bff;
-            color: white;
-        }
-
-        #sign-in-button {
-            background-color: #28a745; 
-            color: white;
-        }
-
-        #sign-out-button {
-            background-color: #dc3545; /* Red */
-            color: white;
-        }
-
-        .admin-button {
-            background-color: #ffc107;
-            color: black;
-            margin: 5px;
-        }
-
-        /* New Ban Button Style for Active Mode */
-        .ban-mode-active {
-            background-color: #dc3545 !important;
-            color: white !important;
-        }
-        
-        #admin-controls {
-            padding: 15px;
-            text-align: center;
-            border-bottom: 1px solid #eee;
-        }
-
-        /* Message Area and Form */
-        #messages {
-            list-style: none;
-            padding: 15px;
-            margin: 0;
-            overflow-y: auto;
-            flex-grow: 1;
-        }
-
-        #messages li {
-            padding: 8px 10px;
-            margin-bottom: 8px;
-            border-radius: 18px;
-            max-width: 90%;
-            line-height: 1.4;
-            word-wrap: break-word;
-            background-color: #e9ecef;
-            display: flex; /* Flex container for the ban button */
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        /* Ban Icon Style */
-        .ban-icon {
-            margin-left: 10px;
-            font-weight: bold;
-            font-size: 1.2em;
-            color: #dc3545; /* Red plus */
-            cursor: pointer;
-            opacity: 0; /* Hidden by default */
-            transition: opacity 0.2s;
-        }
-
-        #messages li:hover .ban-icon {
-            opacity: 1; /* Show on hover */
-        }
-        
-        /* Ban Management Panel Styles */
-        #management-panel {
-            padding: 15px;
-            flex-grow: 1;
-            overflow-y: auto;
-            text-align: left;
-            border-top: 1px solid #eee;
-        }
-        #management-panel h2 {
-            margin-top: 0;
-            font-size: 1.3em;
-            color: #007bff;
-        }
-        #management-list {
-            list-style: none;
-            padding: 0;
-        }
-        #management-list li {
-            background: #fff;
-            padding: 10px;
-            margin-bottom: 5px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .unban-btn {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        #message-form {
-            display: flex;
-            padding: 15px;
-            border-top: 1px solid #eee;
-            gap: 10px;
-        }
-
-        /* Hide chat features when not logged in/chat is disabled or in management mode */
-        .hidden {
-            display: none !important;
-        }
-
-        /* Hide the main content when the chat is disabled */
-        #chat-content {
-            display: flex;
-            flex-direction: column;
-            flex-grow: 1;
-        }
-
     </style>
 </head>
-<body>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
 
-    <div id="chat-container">
-        <h1>Chat 💬</h1>
+    <!-- Custom Modal Structure (Hidden by default) -->
+    <div id="custom-modal" class="fixed inset-0 bg-gray-900 bg-opacity-70 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 transform transition-all duration-300 scale-95 opacity-0" id="modal-content-wrapper">
+            <h3 id="modal-title" class="text-xl font-bold mb-3 text-red-600"></h3>
+            <p id="modal-body" class="text-gray-700 mb-6"></p>
+            <div class="flex justify-end space-x-3">
+                <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition">Cancel</button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium">Confirm</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Chat Container -->
+    <div id="chat-container" class="bg-white rounded-2xl shadow-xl w-full max-w-5xl h-[90vh] flex flex-col md:flex-row overflow-hidden">
 
-        <div id="auth-panel">
-            <span id="user-display">Sign in or register to chat.</span>
+        <!-- Sidebar for Auth and Admin Controls (Hidden on mobile by default) -->
+        <div id="sidebar" class="md:w-1/3 w-full bg-gray-50 p-6 border-r border-gray-200 flex flex-col transition-all duration-300">
+            <h2 class="text-2xl font-extrabold text-blue-600 mb-4 flex items-center">
+                <i data-lucide="message-square-text" class="w-6 h-6 mr-2"></i> Super Chat
+            </h2>
             
-            <input type="email" id="email-input" placeholder="Email" required>
-            <input type="password" id="password-input" placeholder="Password" required>
-            <input type="text" id="display-name-input" placeholder="Display Name (for registration)">
+            <!-- Auth Panel -->
+            <div id="auth-panel" class="mb-6 pb-4 border-b border-gray-200">
+                <p id="user-display" class="text-gray-700 font-semibold mb-3"></p>
+                <div id="auth-inputs">
+                    <input type="email" id="email-input" placeholder="Email" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <input type="password" id="password-input" placeholder="Password" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <input type="text" id="display-name-input" placeholder="Display Name (Registration)" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    
+                    <div class="flex space-x-2">
+                        <button id="sign-in-button" class="flex-1 bg-blue-600 text-white p-2 rounded-lg font-medium hover:bg-blue-700 transition">Sign In</button>
+                        <button id="register-button" class="flex-1 bg-green-600 text-white p-2 rounded-lg font-medium hover:bg-green-700 transition">Register</button>
+                    </div>
+                </div>
+                
+                <button id="sign-out-button" class="hidden w-full bg-red-500 text-white p-2 mt-3 rounded-lg font-medium hover:bg-red-600 transition">Sign Out</button>
+                <div id="auth-error" class="text-red-500 text-sm mt-2"></div>
+            </div>
 
-            <button id="sign-in-button">Sign In</button>
-            <button id="register-button">Register</button>
-            <button id="sign-out-button" class="hidden">Sign Out</button>
-            <div id="auth-error" style="color: red; margin-top: 10px;"></div>
-        </div>
-        
-        <div id="admin-controls" class="hidden">
-            <strong>Admin Panel:</strong>
-            <button id="lock-chat-button" class="admin-button">Lock Chat</button>
-            <button id="disable-chat-button" class="admin-button">Disable Chat</button>
-            <button id="ban-user-button" class="admin-button">Ban By Message</button>
-            <button id="ban-management-button" class="admin-button">Ban Management</button>
-            <div id="admin-status"></div>
-        </div>
-        
-        <div id="management-panel" class="hidden">
-            <h2>Ban Management</h2>
-            <ul id="management-list">
-                </ul>
-        </div>
-        
-        <div id="chat-content">
-            <ul id="messages"></ul>
+            <!-- Admin Controls (Conditional Visibility) -->
+            <div id="admin-controls" class="hidden mb-6 pb-4 border-b border-gray-200">
+                <h3 class="font-bold text-gray-800 mb-2">Admin Panel</h3>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <button id="lock-chat-button" class="admin-button bg-yellow-400 text-gray-800 p-2 rounded-lg hover:bg-yellow-500 transition"></button>
+                    <button id="disable-chat-button" class="admin-button bg-orange-500 text-white p-2 rounded-lg hover:bg-orange-600 transition"></button>
+                    <button id="ban-user-button" class="admin-button bg-purple-500 text-white p-2 rounded-lg hover:bg-purple-600 transition col-span-2"></button>
+                    <button id="ban-management-button" class="admin-button bg-indigo-500 text-white p-2 rounded-lg hover:bg-indigo-600 transition col-span-2"></button>
+                </div>
+                <div id="admin-status" class="text-xs mt-2 text-gray-600 font-medium"></div>
+            </div>
 
-            <form id="message-form" class="hidden">
-                <input type="text" id="message-input" placeholder="Type a message..." required>
-                <button type="submit">Send</button>
+            <!-- Banned User Management Panel -->
+            <div id="management-panel" class="hidden flex-col flex-grow overflow-y-auto">
+                <h3 class="font-bold text-gray-800 mb-3 flex items-center">
+                    <i data-lucide="gavel" class="w-5 h-5 mr-1"></i> Ban Management
+                </h3>
+                <ul id="management-list" class="space-y-2"></ul>
+                <button id="back-to-chat-btn" class="w-full mt-4 p-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium">Back to Chat</button>
+            </div>
+
+            <!-- Mock Active User List -->
+            <div id="user-list" class="mt-auto pt-4 border-t border-gray-200">
+                <h3 class="font-bold text-gray-800 mb-2 flex items-center">
+                    <i data-lucide="users" class="w-5 h-5 mr-1"></i> Active Users (Mock)
+                </h3>
+                <ul id="active-users-list" class="text-sm space-y-1 text-gray-600"></ul>
+            </div>
+            
+            <!-- Mobile Toggle Button (Hidden on desktop) -->
+            <button id="sidebar-toggle" class="md:hidden fixed top-4 right-4 z-30 p-3 bg-blue-600 text-white rounded-full shadow-lg">
+                <i data-lucide="menu" class="w-6 h-6"></i>
+            </button>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div id="chat-main" class="md:w-2/3 w-full flex flex-col relative">
+            <header class="p-4 bg-white border-b border-gray-200 flex justify-between items-center sticky top-0 z-10 md:hidden">
+                <h2 class="text-lg font-bold text-blue-600">Chat</h2>
+            </header>
+
+            <ul id="messages" class="flex-grow overflow-y-auto p-4 space-y-3">
+                <!-- Messages will be injected here -->
+            </ul>
+
+            <!-- Message Input Form -->
+            <form id="message-form" class="hidden p-4 border-t border-gray-200 bg-white">
+                <div class="flex space-x-3">
+                    <input type="text" id="message-input" placeholder="Type your message here..." class="flex-grow p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500" required>
+                    <button type="submit" class="bg-blue-600 text-white p-3 rounded-xl font-medium hover:bg-blue-700 transition flex items-center justify-center">
+                        <i data-lucide="send" class="w-5 h-5"></i>
+                    </button>
+                </div>
             </form>
+            
+            <!-- Chat Disabled Overlay -->
+             <div id="chat-overlay" class="absolute inset-0 bg-gray-50 bg-opacity-90 flex items-center justify-center hidden">
+                <p id="overlay-text" class="text-xl font-semibold text-red-600 p-8 rounded-lg shadow-lg bg-white/90">
+                    Chat is currently disabled or locked.
+                </p>
+            </div>
         </div>
     </div>
 
+    <!-- Firebase SDK Imports -->
     <script type="module">
-        // 1. Firebase Imports (same as before)
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-        import { getDatabase, ref, push, onChildAdded, update, onValue, remove } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js";
+        import { getDatabase, ref, push, onChildAdded, update, onValue, remove, get } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-database.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-auth.js";
         
-        // 2. Configuration & Initialization (same as before)
+        // --- 1. CONFIGURATION & INITIALIZATION ---
+        
         const firebaseConfig = {
             apiKey: "AIzaSyBSgqIz2e8ClflpJV6X5xFKp6dB_nf-7os",
             authDomain: "chatnow-3ed74.firebaseapp.com",
@@ -249,62 +155,148 @@
             appId: "1:327266570463:web:f80dfbafc563b2b731196a",
             measurementId: "G-THVV1JE47T"
         };
+        // Hardcoded list of Admin UIDs (used for client-side UI visibility)
+        const ADMIN_UIDS = ["5iVnNfREQzZ7kA9NxWJlLTG5zq53"]; 
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const database = getDatabase(app);
+        const db = getDatabase(app);
 
-        // Firebase References (same as before)
-        const messagesRef = ref(database, 'messages');
-        const configRef = ref(database, 'adminConfig/config');
-        const bannedRef = ref(database, 'adminConfig/bannedUsers');
+        // Database References
+        const messagesRef = ref(db, 'messages');
+        const configRef = ref(db, 'adminConfig/config');
+        const bannedRef = ref(db, 'adminConfig/bannedUsers');
+        const adminUidsRef = ref(db, 'adminConfig/adminUids');
         
-        // 3. Admin Setup (same as before)
-        const ADMIN_UIDS = [
-            "5iVnNfREQzZ7kA9NxWJlLTG5zq53", 
-            "YOUR_ADMIN_UID_2_FOR_CLIENT_UI"
-        ];
-
+        // State Variables
         let isAdmin = false;
         let currentUser = null;
-        let isBanMode = false; // NEW: State for Ban by Message
+        let isBanMode = false;
+        let isChatLocked = false;
+        let isChatDisabled = false;
+        let isManagementView = false;
         
-        // 4. UI Elements (NEW: Management Panel and Chat Content)
-        const signInButton = document.getElementById('sign-in-button');
-        const registerButton = document.getElementById('register-button');
-        const signOutButton = document.getElementById('sign-out-button');
-        const messageForm = document.getElementById('message-form');
-        const messagesList = document.getElementById('messages');
-        const userDisplay = document.getElementById('user-display');
-        const adminControls = document.getElementById('admin-controls');
-        const lockChatButton = document.getElementById('lock-chat-button');
-        const disableChatButton = document.getElementById('disable-chat-button');
-        const banUserButton = document.getElementById('ban-user-button');
-        const banManagementButton = document.getElementById('ban-management-button'); // NEW
-        const adminStatus = document.getElementById('admin-status');
-        const chatContent = document.getElementById('chat-content'); // NEW
-        const managementPanel = document.getElementById('management-panel'); // NEW
-        const managementList = document.getElementById('management-list'); // NEW
+        // --- 2. UI ELEMENTS & HELPERS ---
         
-        // Email/Password Inputs (same as before)
-        const emailInput = document.getElementById('email-input');
-        const passwordInput = document.getElementById('password-input');
-        const displayNameInput = document.getElementById('display-name-input');
-        const authError = document.getElementById('auth-error');
+        const ui = {
+            // Panels
+            chatContainer: document.getElementById('chat-container'),
+            sidebar: document.getElementById('sidebar'),
+            chatOverlay: document.getElementById('chat-overlay'),
+            overlayText: document.getElementById('overlay-text'),
+            authPanel: document.getElementById('auth-panel'),
+            adminControls: document.getElementById('admin-controls'),
+            managementPanel: document.getElementById('management-panel'),
+            
+            // Inputs & Forms
+            emailInput: document.getElementById('email-input'),
+            passwordInput: document.getElementById('password-input'),
+            displayNameInput: document.getElementById('display-name-input'),
+            messageForm: document.getElementById('message-form'),
+            messageInput: document.getElementById('message-input'),
+            authError: document.getElementById('auth-error'),
+            
+            // Buttons
+            signInButton: document.getElementById('sign-in-button'),
+            registerButton: document.getElementById('register-button'),
+            signOutButton: document.getElementById('sign-out-button'),
+            lockChatButton: document.getElementById('lock-chat-button'),
+            disableChatButton: document.getElementById('disable-chat-button'),
+            banUserButton: document.getElementById('ban-user-button'),
+            banManagementButton: document.getElementById('ban-management-button'),
+            backToChatBtn: document.getElementById('back-to-chat-btn'),
+            sidebarToggle: document.getElementById('sidebar-toggle'),
 
-        // Helper (same as before)
-        const displayError = (message) => {
-            authError.textContent = message;
+            // Lists & Displays
+            userDisplay: document.getElementById('user-display'),
+            adminStatus: document.getElementById('admin-status'),
+            messagesList: document.getElementById('messages'),
+            managementList: document.getElementById('management-list'),
+            activeUsersList: document.getElementById('active-users-list'),
+        };
+
+        // Custom Modal Logic (Replaces alert/confirm)
+        let modalResolve;
+        const modalEl = document.getElementById('custom-modal');
+        const modalWrapper = document.getElementById('modal-content-wrapper');
+
+        const showCustomModal = (title, body, confirmAction) => {
+            return new Promise((resolve) => {
+                modalResolve = resolve;
+                ui.chatContainer.classList.add('pointer-events-none', 'filter', 'blur-sm'); // Blur background
+                modalEl.classList.remove('hidden');
+                modalWrapper.classList.remove('scale-95', 'opacity-0');
+                modalWrapper.classList.add('scale-100', 'opacity-100');
+                
+                document.getElementById('modal-title').textContent = title;
+                document.getElementById('modal-body').textContent = body;
+                
+                const confirmBtn = document.getElementById('modal-confirm-btn');
+                const cancelBtn = document.getElementById('modal-cancel-btn');
+                
+                confirmBtn.textContent = confirmAction || 'Confirm';
+                confirmBtn.onclick = () => { closeModal(true); };
+                cancelBtn.onclick = () => { closeModal(false); };
+            });
+        };
+
+        const closeModal = (result) => {
+            modalWrapper.classList.remove('scale-100', 'opacity-100');
+            modalWrapper.classList.add('scale-95', 'opacity-0');
+            
+            setTimeout(() => {
+                modalEl.classList.add('hidden');
+                ui.chatContainer.classList.remove('pointer-events-none', 'filter', 'blur-sm');
+                if (modalResolve) {
+                    modalResolve(result);
+                }
+            }, 300); // Wait for transition
+        };
+
+        const formatTime = (timestamp) => {
+            const now = Date.now();
+            const diff = now - timestamp; // difference in milliseconds
+            const seconds = Math.floor(diff / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (seconds < 60) return `${seconds}s ago`;
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            return `${days}d ago`;
+        };
+        
+        const displayError = (message) => { ui.authError.textContent = message; };
+
+        // Toggle sidebar for mobile view
+        let isSidebarOpen = true; // Start open on mobile for sign-in
+        const toggleSidebar = () => {
+            isSidebarOpen = !isSidebarOpen;
+            if (isSidebarOpen) {
+                ui.sidebar.classList.remove('hidden');
+                ui.sidebarToggle.innerHTML = '<i data-lucide="x" class="w-6 h-6"></i>';
+            } else {
+                ui.sidebar.classList.add('hidden');
+                ui.sidebarToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
+            }
+            lucide.createIcons(); // Re-render icons after DOM manipulation
+        };
+        // Initial mobile setup
+        if (window.innerWidth < 768) {
+            toggleSidebar(); // Close sidebar initially
+            ui.sidebarToggle.classList.remove('hidden');
         }
+        ui.sidebarToggle.addEventListener('click', toggleSidebar);
+        
+        // --- 3. AUTHENTICATION ---
 
-        // 5. Authentication Functions (same as before)
-        // ... (signInButton, registerButton, signOutButton listeners are unchanged) ...
-
-        registerButton.addEventListener('click', async () => {
-            const email = emailInput.value;
-            const password = passwordInput.value;
-            const displayName = displayNameInput.value;
+        ui.registerButton.addEventListener('click', async () => {
+            const email = ui.emailInput.value;
+            const password = ui.passwordInput.value;
+            const displayName = ui.displayNameInput.value;
             displayError('');
+
             if (!email || !password || !displayName) {
                 displayError("Email, password, and display name are required for registration.");
                 return;
@@ -317,10 +309,11 @@
             }
         });
 
-        signInButton.addEventListener('click', async () => {
-            const email = emailInput.value;
-            const password = passwordInput.value;
+        ui.signInButton.addEventListener('click', async () => {
+            const email = ui.emailInput.value;
+            const password = ui.passwordInput.value;
             displayError('');
+
             if (!email || !password) {
                 displayError("Email and password are required for sign in.");
                 return;
@@ -332,243 +325,281 @@
             }
         });
 
-        signOutButton.addEventListener('click', () => {
+        ui.signOutButton.addEventListener('click', () => {
             signOut(auth).catch((error) => console.error("Sign Out Error:", error));
-            // Hide ban management panel on sign out
-            managementPanel.classList.add('hidden');
         });
 
-
-        // 6. Real-time Authentication State Listener (Unchanged)
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
             displayError('');
+            
+            // Hide all admin/chat elements initially
+            ui.messageForm.classList.add('hidden');
+            ui.adminControls.classList.add('hidden');
+            ui.managementPanel.classList.add('hidden');
+            ui.chatOverlay.classList.add('hidden');
 
             if (user) {
+                // Check if user is in the hardcoded admin list for UI visibility
                 isAdmin = ADMIN_UIDS.includes(user.uid); 
                 const userName = user.displayName || user.email.split('@')[0]; 
-                userDisplay.textContent = `Welcome, ${userName}.`;
+                ui.userDisplay.textContent = `Hello, ${userName} ${isAdmin ? '(Admin)' : ''}.`;
 
-                emailInput.classList.add('hidden');
-                passwordInput.classList.add('hidden');
-                displayNameInput.classList.add('hidden');
-                signInButton.classList.add('hidden');
-                registerButton.classList.add('hidden');
-                signOutButton.classList.remove('hidden');
+                // Update UI based on logged-in state
+                document.getElementById('auth-inputs').classList.add('hidden');
+                ui.signOutButton.classList.remove('hidden');
 
                 if (isAdmin) {
-                    adminControls.classList.remove('hidden');
-                } else {
-                    adminControls.classList.add('hidden');
+                    ui.adminControls.classList.remove('hidden');
                 }
 
-                checkChatStateAndBan();
+                // Check initial chat state and ban status
+                checkChatStateAndBanStatus();
 
             } else {
-                userDisplay.textContent = "Sign in or register to chat.";
-
-                emailInput.classList.remove('hidden');
-                passwordInput.classList.remove('hidden');
-                displayNameInput.classList.remove('hidden');
-                signInButton.classList.remove('hidden');
-                registerButton.classList.remove('hidden');
-                signOutButton.classList.add('hidden');
-                
-                // Hide ALL chat elements and management panel
-                chatContent.classList.add('hidden'); 
-                messageForm.classList.add('hidden');
-                adminControls.classList.add('hidden');
-                managementPanel.classList.add('hidden');
-                isAdmin = false;
+                ui.userDisplay.textContent = "Sign in or register to chat.";
+                document.getElementById('auth-inputs').classList.remove('hidden');
+                ui.signOutButton.classList.add('hidden');
             }
         });
         
-        // --- Admin and Message Logic ---
-        
-        let isChatLocked = false;
-        let isChatDisabled = false;
+        // --- 4. CHAT STATE & BAN LOGIC ---
 
-        const checkChatStateAndBan = () => {
+        const checkChatStateAndBanStatus = () => {
             if (!currentUser) return;
 
-            // Check ban status (Unchanged)
-            onValue(ref(database, `adminConfig/bannedUsers/${currentUser.uid}`), (snapshot) => {
-                const isBanned = snapshot.exists() && snapshot.val() === true;
+            // 4a. Check Ban Status
+            onValue(ref(db, `adminConfig/bannedUsers/${currentUser.uid}`), (snapshot) => {
+                const isBanned = snapshot.val() === true;
                 
                 if (isBanned) {
-                    userDisplay.textContent = `⛔ You have been banned from this chat.`;
-                    messageForm.classList.add('hidden');
-                    chatContent.classList.add('hidden'); // Hide chat content if banned
+                    ui.userDisplay.textContent = `⛔ You have been banned from this chat.`;
+                    showChatOverlay("⛔ You have been permanently banned from the chat.");
+                    ui.messageForm.classList.add('hidden');
                 } else {
-                    // Check chat lock/disable status
-                    onValue(configRef, (snapshot) => {
-                        const config = snapshot.val() || {};
+                    // 4b. Check Admin Config (Locked/Disabled)
+                    onValue(configRef, (configSnapshot) => {
+                        const config = configSnapshot.val() || {};
                         isChatLocked = config.locked || false;
                         isChatDisabled = config.disabled || false;
                         
-                        // Admin UI updates
-                        if (isAdmin) {
-                            lockChatButton.textContent = isChatLocked ? 'Unlock Chat' : 'Lock Chat';
-                            disableChatButton.textContent = isChatDisabled ? 'Enable Chat' : 'Disable Chat';
-                            let statusText = `Locked: ${isChatLocked ? 'Yes' : 'No'} | Disabled: ${isChatDisabled ? 'Yes' : 'No'}`;
-                            adminStatus.textContent = statusText;
-                            
-                            // Admins always see chat content, even if disabled/locked
-                            chatContent.classList.remove('hidden'); 
-                            messageForm.classList.remove('hidden');
-                            return;
-                        }
-
-                        // Regular user access
-                        if (isChatDisabled) {
-                            userDisplay.textContent = "Chat has been DISABLED by an admin.";
-                            chatContent.classList.add('hidden'); // HIDE ENTIRE CHAT
-                            messageForm.classList.add('hidden');
-                        } else if (isChatLocked) {
-                            userDisplay.textContent = "Chat is currently LOCKED by an admin.";
-                            chatContent.classList.remove('hidden'); 
-                            messageForm.classList.add('hidden');
-                        } else {
-                            const userName = currentUser.displayName || currentUser.email.split('@')[0];
-                            userDisplay.textContent = `Welcome, ${userName}.`;
-                            chatContent.classList.remove('hidden'); 
-                            messageForm.classList.remove('hidden');
-                        }
+                        updateChatUI();
                     }, { onlyOnce: false });
                 }
             }, { onlyOnce: false });
         };
         
-        // NEW: Toggle Ban Mode
+        const updateChatUI = () => {
+            // 1. Admin updates
+            if (isAdmin) {
+                ui.lockChatButton.textContent = isChatLocked ? 'Unlock Chat' : 'Lock Chat';
+                ui.disableChatButton.textContent = isChatDisabled ? 'Enable Chat' : 'Disable Chat';
+                let statusText = `Locked: ${isChatLocked ? 'Yes' : 'No'} | Disabled: ${isChatDisabled ? 'Yes' : 'No'} | Ban Mode: ${isBanMode ? 'Active' : 'Off'}`;
+                ui.adminStatus.textContent = statusText;
+                
+                // Admins always see chat content and input unless in management view
+                if (!isManagementView) {
+                    ui.chatOverlay.classList.add('hidden');
+                    ui.messageForm.classList.remove('hidden');
+                }
+                return;
+            }
+
+            // 2. Regular user access
+            ui.messageForm.classList.remove('hidden');
+            ui.chatOverlay.classList.add('hidden');
+            
+            if (isChatDisabled) {
+                showChatOverlay("Chat is currently DISABLED by an administrator.");
+                ui.messageForm.classList.add('hidden');
+            } else if (isChatLocked) {
+                showChatOverlay("Chat is currently LOCKED by an administrator (read-only).");
+                ui.messageForm.classList.add('hidden');
+            }
+        }
+        
+        const showChatOverlay = (text) => {
+            ui.chatOverlay.classList.remove('hidden');
+            ui.overlayText.textContent = text;
+        }
+
+        // --- 5. ADMIN ACTIONS ---
+        
         const toggleBanMode = () => {
             if (!isAdmin) return;
-
             isBanMode = !isBanMode;
-            banUserButton.textContent = isBanMode ? 'Exit Ban Mode' : 'Ban By Message';
-            banUserButton.classList.toggle('ban-mode-active', isBanMode);
+            ui.banUserButton.textContent = isBanMode ? 'Exit Ban Mode' : 'Ban By Message';
+            ui.banUserButton.classList.toggle('bg-red-600', isBanMode);
+            ui.banUserButton.classList.toggle('hover:bg-red-700', isBanMode);
+            ui.banUserButton.classList.toggle('bg-purple-500', !isBanMode);
+            ui.banUserButton.classList.toggle('hover:bg-purple-600', !isBanMode);
 
             // Toggle visibility of ban icons on all messages
-            document.querySelectorAll('.ban-icon').forEach(icon => {
-                icon.style.opacity = isBanMode ? 1 : 0;
+            document.querySelectorAll('.admin-actions').forEach(actions => {
+                actions.classList.toggle('opacity-100', isBanMode);
             });
+            updateChatUI(); // Update admin status text
         };
 
-        // NEW: Ban User from Message Click
-        const handleBanMessageClick = (e) => {
-            if (!isAdmin || !isBanMode) return;
+        const banUser = async (uidToBan, userName) => {
+            const confirmed = await showCustomModal(
+                'Confirm Ban',
+                `Are you sure you want to permanently ban ${userName} (UID: ${uidToBan}) from the chat?`,
+                'Confirm Ban'
+            );
+            
+            if (confirmed) {
+                update(ref(db, `adminConfig/bannedUsers/${uidToBan}`), { [uidToBan]: true })
+                    .then(() => {
+                        showCustomModal('Success', `${userName} has been banned.`, 'OK');
+                        if (isBanMode) toggleBanMode(); // Exit ban mode after ban
+                    })
+                    .catch(error => showCustomModal('Error', `Ban Error: ${error.message}`, 'Close'));
+            }
+        };
+        
+        const deleteMessage = async (messageId) => {
+             const confirmed = await showCustomModal(
+                'Confirm Deletion',
+                'Are you sure you want to delete this message? This action cannot be undone.',
+                'Delete'
+            );
+            
+            if (confirmed) {
+                remove(ref(db, `messages/${messageId}`))
+                    .then(() => {
+                        // The onChildRemoved listener handles the UI update
+                    })
+                    .catch(error => showCustomModal('Error', `Deletion Error: ${error.message}`, 'Close'));
+            }
+        }
+        
+        // Listener for ban/delete actions on the message list
+        ui.messagesList.addEventListener('click', (e) => {
+            if (!isAdmin || isManagementView) return;
 
-            const icon = e.target.closest('.ban-icon');
+            const icon = e.target.closest('.admin-action-icon');
             if (!icon) return;
 
-            const uidToBan = icon.dataset.uid;
-            const userName = icon.dataset.name;
-
-            if (confirm(`Are you sure you want to ban ${userName} (UID: ${uidToBan})?`)) {
-                update(ref(database, `adminConfig/bannedUsers/${uidToBan}`), { isBanned: true })
-                    .then(() => {
-                        alert(`User ${userName} has been banned.`);
-                        toggleBanMode(); // Exit ban mode after ban
-                    })
-                    .catch(error => console.error("Ban Error:", error));
-            }
-        };
-
-        // NEW: Show Ban Management Screen
-        const showBanManagement = () => {
-            if (!isAdmin) return;
-
-            // Toggle views
-            chatContent.classList.add('hidden');
-            managementPanel.classList.remove('hidden');
-            managementList.innerHTML = '<li>Loading banned users...</li>';
+            const messageId = icon.dataset.messageId;
             
-            // Fetch Banned Users
-            onValue(bannedRef, (snapshot) => {
-                managementList.innerHTML = '';
-                const bannedUsers = snapshot.val();
-                
-                if (!bannedUsers || Object.keys(bannedUsers).length === 0) {
-                    managementList.innerHTML = '<li>No users are currently banned.</li>';
-                    return;
-                }
-
-                // Temporary list to hold UID->Email/DisplayName mappings
-                const uidsToFetch = Object.keys(bannedUsers).filter(uid => bannedUsers[uid] === true);
-
-                if (uidsToFetch.length === 0) {
-                    managementList.innerHTML = '<li>No users are currently banned.</li>';
-                    return;
-                }
-                
-                // NOTE: Fetching email/display name for a list of UIDs is complex without a secure backend API.
-                // We will display UID and a placeholder, as Firebase Auth data is not directly queryable in the DB rules.
-                
-                uidsToFetch.forEach(uid => {
-                    const li = document.createElement('li');
-                    li.innerHTML = `
-                        <span>
-                            <strong>UID:</strong> ${uid} <br>
-                            <strong>Status:</strong> Banned 
-                        </span>
-                        <button class="unban-btn" data-uid="${uid}">Unban</button>
-                    `;
-                    managementList.appendChild(li);
-                });
-            }, { onlyOnce: true });
-        };
-
-        // NEW: Ban Management List Click Listener (for Unban)
-        managementList.addEventListener('click', (e) => {
-            if (!isAdmin || !e.target.classList.contains('unban-btn')) return;
-
-            const uidToUnban = e.target.dataset.uid;
-            
-            if (confirm(`Are you sure you want to UNBAN UID: ${uidToUnban}?`)) {
-                 // Remove the entry from the database to unban
-                remove(ref(database, `adminConfig/bannedUsers/${uidToUnban}`))
-                    .then(() => {
-                        alert(`User ${uidToUnban} unbanned.`);
-                        showBanManagement(); // Refresh the list
-                    })
-                    .catch(error => console.error("Unban Error:", error));
+            if (icon.classList.contains('ban-icon') && isBanMode) {
+                const uidToBan = icon.dataset.uid;
+                const userName = icon.dataset.name;
+                banUser(uidToBan, userName);
+            } else if (icon.classList.contains('delete-icon')) {
+                deleteMessage(messageId);
             }
         });
-
-
-        // Admin Controls Event Handlers (Updated for new features)
-        lockChatButton.addEventListener('click', () => {
+        
+        // Toggle Chat Lock/Disable
+        ui.lockChatButton.addEventListener('click', () => {
             if (isAdmin) { update(configRef, { locked: !isChatLocked }); }
         });
 
-        disableChatButton.addEventListener('click', () => {
+        ui.disableChatButton.addEventListener('click', () => {
              if (isAdmin) { update(configRef, { disabled: !isChatDisabled }); }
         });
 
-        banUserButton.addEventListener('click', () => {
+        ui.banUserButton.addEventListener('click', () => {
+             if (isManagementView) toggleManagementView(); // Exit management first
              toggleBanMode();
-             // Ensure management panel is hidden when starting ban mode
-             managementPanel.classList.add('hidden');
         });
 
-        banManagementButton.addEventListener('click', () => {
-            // Hide the chat content and show the management panel
-            showBanManagement();
-            // Exit ban mode if active
+        // --- 6. BAN MANAGEMENT VIEW ---
+
+        const toggleManagementView = () => {
+            isManagementView = !isManagementView;
+            
+            if (isManagementView) {
+                ui.managementPanel.classList.remove('hidden');
+                ui.messageForm.classList.add('hidden');
+                ui.messagesList.classList.add('hidden');
+                ui.chatOverlay.classList.add('hidden');
+                ui.adminControls.classList.add('hidden');
+                loadBannedUsers();
+            } else {
+                ui.managementPanel.classList.add('hidden');
+                ui.messagesList.classList.remove('hidden');
+                ui.adminControls.classList.remove('hidden');
+                updateChatUI(); // Re-check chat status for admin view
+            }
+            // Ensure ban mode is off when entering management
             if (isBanMode) toggleBanMode(); 
+        };
+        
+        ui.banManagementButton.addEventListener('click', toggleManagementView);
+        ui.backToChatBtn.addEventListener('click', toggleManagementView);
+
+        const loadBannedUsers = async () => {
+            ui.managementList.innerHTML = '<li class="text-gray-500">Loading banned users...</li>';
+
+            try {
+                const snapshot = await get(bannedRef);
+                const bannedUsers = snapshot.val();
+                ui.managementList.innerHTML = '';
+
+                if (!bannedUsers || Object.keys(bannedUsers).length === 0) {
+                    ui.managementList.innerHTML = '<li class="text-gray-500 p-3 bg-white rounded-lg border">No users are currently banned.</li>';
+                    return;
+                }
+                
+                Object.keys(bannedUsers).forEach(uid => {
+                    if (bannedUsers[uid] === true) {
+                        const li = document.createElement('li');
+                        li.className = 'bg-white p-3 rounded-lg shadow-sm border border-red-200 flex justify-between items-center';
+                        li.innerHTML = `
+                            <span class="text-sm">
+                                <strong>UID:</strong> ${uid} <br>
+                                <span class="text-red-600 font-medium">Status: BANNED</span> 
+                            </span>
+                            <button class="unban-btn bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 transition text-sm" data-uid="${uid}">
+                                <i data-lucide="unlock" class="w-4 h-4 inline-block mr-1"></i> Unban
+                            </button>
+                        `;
+                        ui.managementList.appendChild(li);
+                    }
+                });
+                lucide.createIcons();
+            } catch (error) {
+                 ui.managementList.innerHTML = `<li class="text-red-500 p-3">Error loading banned users: ${error.message}</li>`;
+            }
+        };
+
+        // Ban Management List Click Listener (for Unban)
+        ui.managementList.addEventListener('click', async (e) => {
+            if (!isAdmin || !e.target.closest('.unban-btn')) return;
+
+            const btn = e.target.closest('.unban-btn');
+            const uidToUnban = btn.dataset.uid;
+            
+            const confirmed = await showCustomModal(
+                'Confirm Unban',
+                `Are you sure you want to unban UID: ${uidToUnban}?`,
+                'Confirm Unban'
+            );
+
+            if (confirmed) {
+                 remove(ref(db, `adminConfig/bannedUsers/${uidToUnban}`))
+                    .then(() => {
+                        showCustomModal('Success', `User ${uidToUnban} unbanned.`, 'OK');
+                        loadBannedUsers(); // Refresh the list
+                    })
+                    .catch(error => showCustomModal('Error', `Unban Error: ${error.message}`, 'Close'));
+            }
         });
+        
+        // --- 7. MESSAGE SENDING/RECEIVING ---
 
-
-        // Message Sending (Unchanged)
-        messageForm.addEventListener('submit', function(e) {
+        ui.messageForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            // ... (message sending logic remains the same) ...
-
-            if (!currentUser || (isChatLocked && !isAdmin) || (isChatDisabled && !isAdmin)) {
-                alert("You cannot send messages right now.");
+            
+            if (!currentUser || isChatDisabled || (isChatLocked && !isAdmin)) {
+                showCustomModal('Access Denied', 'You cannot send messages right now.', 'Close');
                 return;
             }
             
-            const message = messageInput.value.trim();
+            const message = ui.messageInput.value.trim();
             const userName = currentUser.displayName || currentUser.email.split('@')[0];
 
             if (message) {
@@ -578,50 +609,113 @@
                     text: message,
                     timestamp: Date.now()
                 });
-
-                messageInput.value = '';
+                ui.messageInput.value = '';
             }
         });
 
-        // Message Receiving (Updated to include ban icon)
-        messagesList.addEventListener('click', handleBanMessageClick); // NEW listener for the list
-
+        // Message Receiving (onChildAdded)
         onChildAdded(messagesRef, (snapshot) => {
             const data = snapshot.val();
-            const messageElement = document.createElement('li');
-
+            const messageId = snapshot.key;
             const isSenderAdmin = ADMIN_UIDS.includes(data.uid);
-            
-            // Build the core message content
-            const messageContent = document.createElement('span');
-            messageContent.innerHTML = `<strong>${data.name}:</strong> ${data.text}`;
-            messageElement.appendChild(messageContent);
 
-            // Add Ban Icon
-            const banIcon = document.createElement('span');
-            banIcon.classList.add('ban-icon');
-            banIcon.textContent = '+';
-            banIcon.dataset.uid = data.uid;
-            banIcon.dataset.name = data.name;
+            const li = document.createElement('li');
+            li.id = `message-${messageId}`;
+            li.className = `message-item flex justify-between items-start p-3 rounded-xl shadow-md transition-all duration-300 ${
+                isSenderAdmin 
+                    ? 'bg-red-100 border-l-4 border-red-500 text-gray-800' 
+                    : 'bg-white border-l-4 border-blue-100 text-gray-800'
+            }`;
             
-            // Set opacity based on current ban mode state
-            if (isAdmin && isBanMode) {
-                banIcon.style.opacity = 1;
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'flex flex-col min-w-0';
+
+            // Sender and Time
+            const header = document.createElement('div');
+            header.className = 'flex items-center space-x-2 mb-1';
+            header.innerHTML = `
+                <strong class="font-bold ${isSenderAdmin ? 'text-red-700' : 'text-blue-600'}">${data.name}</strong>
+                ${isSenderAdmin ? '<span class="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-semibold">ADMIN</span>' : ''}
+                <span class="text-xs text-gray-400 ml-auto" data-timestamp="${data.timestamp}">${formatTime(data.timestamp)}</span>
+            `;
+            
+            // Message Text
+            const text = document.createElement('p');
+            text.className = 'break-words overflow-hidden';
+            text.textContent = data.text;
+            
+            contentDiv.appendChild(header);
+            contentDiv.appendChild(text);
+            li.appendChild(contentDiv);
+
+            // Admin Actions (Ban/Delete)
+            if (currentUser && isAdmin) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = `admin-actions flex space-x-2 ml-3 items-center flex-shrink-0 ${isBanMode ? 'opacity-100' : 'opacity-0'}`;
+                
+                // Ban Icon (Only visible in Ban Mode)
+                const banIcon = `<button class="admin-action-icon ban-icon text-red-500 hover:text-red-700 p-1 rounded-full bg-red-100 transition" data-uid="${data.uid}" data-name="${data.name}" data-message-id="${messageId}" title="Ban User">
+                    <i data-lucide="user-x" class="w-4 h-4"></i>
+                </button>`;
+                
+                // Delete Icon (Always visible for Admins on hover)
+                const deleteIcon = `<button class="admin-action-icon delete-icon text-gray-500 hover:text-gray-700 p-1 rounded-full bg-gray-100 transition" data-message-id="${messageId}" title="Delete Message">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>`;
+
+                actionsDiv.innerHTML = banIcon + deleteIcon;
+                li.appendChild(actionsDiv);
             }
+
+            ui.messagesList.appendChild(li);
+            ui.messagesList.scrollTop = ui.messagesList.scrollHeight;
+            lucide.createIcons(); // Render icons
+        });
+
+        // Message Deletion (onChildRemoved)
+        onValue(messagesRef, (snapshot) => {
+            const currentMessageIds = new Set();
+            snapshot.forEach(child => currentMessageIds.add(child.key));
             
-            messageElement.appendChild(banIcon);
+            // Get all message elements currently in the DOM
+            const allListItems = ui.messagesList.querySelectorAll('li[id^="message-"]');
 
-            if (isSenderAdmin) {
-                 messageElement.style.backgroundColor = '#f8d7da';
-                 messageElement.style.color = '#721c24';
+            allListItems.forEach(li => {
+                const messageId = li.id.replace('message-', '');
+                if (!currentMessageIds.has(messageId)) {
+                    li.remove(); // Remove element if it no longer exists in DB
+                }
+            });
+        });
+
+        // Update timestamps every minute
+        setInterval(() => {
+            document.querySelectorAll('[data-timestamp]').forEach(el => {
+                const timestamp = parseInt(el.dataset.timestamp, 10);
+                el.textContent = formatTime(timestamp);
+            });
+        }, 60000); // 1 minute
+        
+        // Mock User List update (to show in the sidebar)
+        const updateMockUsers = () => {
+            ui.activeUsersList.innerHTML = `
+                <li class="flex items-center"><i data-lucide="circle" class="w-2 h-2 mr-2 text-green-500 fill-current"></i> You (${currentUser ? (currentUser.displayName || 'Guest') : 'Offline'})</li>
+                <li class="flex items-center"><i data-lucide="circle" class="w-2 h-2 mr-2 text-green-500 fill-current"></i> Admin (Simulated)</li>
+                <li class="flex items-center"><i data-lucide="circle" class="w-2 h-2 mr-2 text-yellow-500 fill-current"></i> JaneDoe</li>
+            `;
+            lucide.createIcons();
+        }
+        
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            if (user) {
+                updateMockUsers();
+            } else {
+                 ui.activeUsersList.innerHTML = '<li class="text-gray-400">Sign in to see users.</li>';
             }
-
-            messagesList.appendChild(messageElement);
-
-            messagesList.scrollTop = messagesList.scrollHeight;
         });
 
     </script>
-
 </body>
 </html>
+
