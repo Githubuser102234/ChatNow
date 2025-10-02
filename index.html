@@ -18,16 +18,26 @@
         .ban-icon, .delete-icon { transition: opacity 0.2s; }
         .message-item:hover .admin-actions { opacity: 1; }
         .admin-actions { opacity: 0; transition: opacity 0.2s; }
-        /* Full screen overlay for mobile layout */
+        
+        /* FIX: Mobile Sidebar Transition & Positioning */
         @media (max-width: 768px) {
             #sidebar {
-                position: absolute;
+                position: fixed; 
                 top: 0;
                 left: 0;
                 width: 100%;
                 height: 100%;
                 z-index: 20;
+                /* Start off-screen */
+                transform: translateX(-100%); 
+                transition: transform 0.3s ease-in-out;
             }
+            /* Open state */
+            #sidebar.open {
+                transform: translateX(0);
+            }
+            /* Ensure the sidebar starts closed visually on small screens */
+            .md\:w-1\/3 { width: 100%; }
         }
     </style>
 </head>
@@ -142,7 +152,7 @@
     <script type="module">
         // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js";
-        import { getDatabase, ref, push, onChildAdded, onChildRemoved, onValue, set, remove, get, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-database.js";
+        import { getDatabase, ref, push, onChildAdded, onChildRemoved, onValue, set, remove, get, serverTimestamp, update } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-database.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-auth.js";
         
         // --- 1. CONFIGURATION & INITIALIZATION ---
@@ -168,7 +178,7 @@
         const messagesRef = ref(db, 'messages');
         const configRef = ref(db, 'adminConfig/config');
         const bannedRef = ref(db, 'adminConfig/bannedUsers');
-        const activeUsersRef = ref(db, 'activeUsers'); // NEW: Active Users reference
+        const activeUsersRef = ref(db, 'activeUsers');
         
         // State Variables
         let isAdmin = false;
@@ -225,7 +235,7 @@
         const showCustomModal = (title, body, confirmAction) => {
             return new Promise((resolve) => {
                 modalResolve = resolve;
-                ui.chatContainer.classList.add('pointer-events-none', 'filter', 'blur-sm'); // Blur background
+                ui.chatContainer.classList.add('pointer-events-none', 'filter', 'blur-sm'); 
                 modalEl.classList.remove('hidden');
                 modalWrapper.classList.remove('scale-95', 'opacity-0');
                 modalWrapper.classList.add('scale-100', 'opacity-100');
@@ -252,12 +262,12 @@
                 if (modalResolve) {
                     modalResolve(result);
                 }
-            }, 300); // Wait for transition
+            }, 300); 
         };
 
         const formatTime = (timestamp) => {
             const now = Date.now();
-            const diff = now - timestamp; // difference in milliseconds
+            const diff = now - timestamp; 
             const seconds = Math.floor(diff / 1000);
             const minutes = Math.floor(seconds / 60);
             const hours = Math.floor(minutes / 60);
@@ -267,22 +277,21 @@
             if (minutes < 60) return `${minutes}m ago`;
             if (hours < 24) return `${hours}h ago`;
             
-            // Fallback to local time string if older than 24 hours
             const date = new Date(timestamp);
             return date.toLocaleDateString();
         };
         
         const displayError = (message) => { ui.authError.textContent = message; };
 
-        // Toggle sidebar for mobile view
-        let isSidebarOpen = false; // Start closed on mobile for initial clean look
+        // FIX: Toggle sidebar for mobile view (using CSS classes for transition)
+        let isSidebarOpen = false; // Start closed on mobile 
         const toggleSidebar = () => {
             isSidebarOpen = !isSidebarOpen;
             if (isSidebarOpen) {
-                ui.sidebar.classList.remove('hidden');
+                ui.sidebar.classList.add('open');
                 ui.sidebarToggle.innerHTML = '<i data-lucide="x" class="w-6 h-6"></i>';
             } else {
-                ui.sidebar.classList.add('hidden');
+                ui.sidebar.classList.remove('open');
                 ui.sidebarToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
             }
             lucide.createIcons(); // Re-render icons after DOM manipulation
@@ -290,10 +299,12 @@
         
         // Initial mobile setup
         if (window.innerWidth < 768) {
-            ui.sidebar.classList.add('hidden'); 
+            // Remove the 'hidden' class and rely on CSS transform for initial closed state
+            ui.sidebar.classList.remove('hidden'); 
             ui.sidebarToggle.classList.remove('hidden');
         } else {
             isSidebarOpen = true; // Always open on desktop
+            ui.sidebar.classList.add('open'); // Ensure desktop view has the 'open' state (though CSS prevents translation)
         }
         ui.sidebarToggle.addEventListener('click', toggleSidebar);
         
@@ -341,7 +352,7 @@
             signOut(auth).catch((error) => console.error("Sign Out Error:", error));
         });
         
-        // Setup user presence tracking (RTDB only, Firestore is not used here)
+        // Setup user presence tracking
         const setupPresence = (user) => {
             if (!user) return;
             const userStatusRef = ref(db, 'activeUsers/' + user.uid);
@@ -413,8 +424,9 @@
                     // 4b. Check Admin Config (Locked/Disabled)
                     onValue(configRef, (configSnapshot) => {
                         const config = configSnapshot.val() || {};
-                        isChatLocked = config.locked || false;
-                        isChatDisabled = config.disabled || false;
+                        // Using explicit boolean conversion to handle 'null' or 'undefined' gracefully
+                        isChatLocked = !!config.locked; 
+                        isChatDisabled = !!config.disabled;
                         
                         updateChatUI();
                     }, { onlyOnce: false });
@@ -641,19 +653,18 @@
                     uid: currentUser.uid,
                     name: userName,
                     text: message,
-                    timestamp: Date.now() // Using client timestamp is fine for display
+                    timestamp: Date.now()
                 });
                 ui.messageInput.value = '';
             }
         });
 
-        // Message ADDITION (Fixes the one-message bug)
+        // Message ADDITION
         onChildAdded(messagesRef, (snapshot) => {
             const data = snapshot.val();
             const messageId = snapshot.key;
             const isSenderAdmin = ADMIN_UIDS.includes(data.uid);
 
-            // Check if element already exists (to prevent duplicates on re-auth/re-connect)
             if (document.getElementById(`message-${messageId}`)) return; 
             
             const li = document.createElement('li');
@@ -709,7 +720,7 @@
             lucide.createIcons(); // Render icons
         });
 
-        // Message REMOVAL (Correct way to handle deletion)
+        // Message REMOVAL
         onChildRemoved(messagesRef, (snapshot) => {
             const messageId = snapshot.key;
             const element = document.getElementById(`message-${messageId}`);
@@ -762,6 +773,9 @@
             ui.activeUserCount.textContent = userCount.toString();
             lucide.createIcons();
         });
+        
+        // Initial icon creation for all static elements
+        lucide.createIcons();
 
     </script>
 </body>
