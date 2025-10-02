@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat 💬</title>
     <style>
-        /* General Styles (from previous "fancy" version, adjusted) */
+        /* General Styles */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: #f0f2f5;
@@ -82,6 +82,12 @@
             color: black;
             margin: 5px;
         }
+
+        /* New Ban Button Style for Active Mode */
+        .ban-mode-active {
+            background-color: #dc3545 !important;
+            color: white !important;
+        }
         
         #admin-controls {
             padding: 15px;
@@ -89,7 +95,7 @@
             border-bottom: 1px solid #eee;
         }
 
-        /* Message Area and Form (Unchanged) */
+        /* Message Area and Form */
         #messages {
             list-style: none;
             padding: 15px;
@@ -106,12 +112,60 @@
             line-height: 1.4;
             word-wrap: break-word;
             background-color: #e9ecef;
+            display: flex; /* Flex container for the ban button */
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Ban Icon Style */
+        .ban-icon {
+            margin-left: 10px;
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #dc3545; /* Red plus */
+            cursor: pointer;
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.2s;
+        }
+
+        #messages li:hover .ban-icon {
+            opacity: 1; /* Show on hover */
         }
         
-        #messages li strong {
-            font-weight: 600;
+        /* Ban Management Panel Styles */
+        #management-panel {
+            padding: 15px;
+            flex-grow: 1;
+            overflow-y: auto;
+            text-align: left;
+            border-top: 1px solid #eee;
+        }
+        #management-panel h2 {
+            margin-top: 0;
+            font-size: 1.3em;
             color: #007bff;
-            margin-right: 5px;
+        }
+        #management-list {
+            list-style: none;
+            padding: 0;
+        }
+        #management-list li {
+            background: #fff;
+            padding: 10px;
+            margin-bottom: 5px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .unban-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
         }
 
         #message-form {
@@ -121,27 +175,18 @@
             gap: 10px;
         }
 
-        #message-input {
-            padding: 10px;
-            border: 1px solid #ced4da;
-            border-radius: 20px;
-            font-size: 1em;
-            flex-grow: 1;
-        }
-
-        button[type="submit"] {
-            padding: 10px 15px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 20px;
-            font-weight: 500;
-        }
-
-        /* Hide chat features when not logged in/chat is disabled */
+        /* Hide chat features when not logged in/chat is disabled or in management mode */
         .hidden {
             display: none !important;
         }
+
+        /* Hide the main content when the chat is disabled */
+        #chat-content {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
     </style>
 </head>
 <body>
@@ -166,32 +211,34 @@
             <strong>Admin Panel:</strong>
             <button id="lock-chat-button" class="admin-button">Lock Chat</button>
             <button id="disable-chat-button" class="admin-button">Disable Chat</button>
-            <button id="ban-user-button" class="admin-button">Ban User (Test)</button>
+            <button id="ban-user-button" class="admin-button">Ban By Message</button>
+            <button id="ban-management-button" class="admin-button">Ban Management</button>
             <div id="admin-status"></div>
         </div>
+        
+        <div id="management-panel" class="hidden">
+            <h2>Ban Management</h2>
+            <ul id="management-list">
+                </ul>
+        </div>
+        
+        <div id="chat-content">
+            <ul id="messages"></ul>
 
-        <ul id="messages"></ul>
-
-        <form id="message-form" class="hidden">
-            <input type="text" id="message-input" placeholder="Type a message..." required>
-            <button type="submit">Send</button>
-        </form>
+            <form id="message-form" class="hidden">
+                <input type="text" id="message-input" placeholder="Type a message..." required>
+                <button type="submit">Send</button>
+            </form>
+        </div>
     </div>
 
     <script type="module">
-        // 1. Firebase Imports
+        // 1. Firebase Imports (same as before)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-        import { getDatabase, ref, push, onChildAdded, update, onValue } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js";
-        import { 
-            getAuth, 
-            createUserWithEmailAndPassword, 
-            signInWithEmailAndPassword, 
-            signOut, 
-            onAuthStateChanged,
-            updateProfile
-        } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+        import { getDatabase, ref, push, onChildAdded, update, onValue, remove } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
         
-        // 2. Configuration & Initialization
+        // 2. Configuration & Initialization (same as before)
         const firebaseConfig = {
             apiKey: "AIzaSyBSgqIz2e8ClflpJV6X5xFKp6dB_nf-7os",
             authDomain: "chatnow-3ed74.firebaseapp.com",
@@ -207,17 +254,12 @@
         const auth = getAuth(app);
         const database = getDatabase(app);
 
-        // Firebase References
+        // Firebase References (same as before)
         const messagesRef = ref(database, 'messages');
-        // Admin configuration is nested under adminConfig
-        const adminConfigRef = ref(database, 'adminConfig'); 
         const configRef = ref(database, 'adminConfig/config');
         const bannedRef = ref(database, 'adminConfig/bannedUsers');
-        const adminUidsRef = ref(database, 'adminConfig/adminUids');
-
-        // 3. Admin Setup
-        // !!! IMPORTANT: THIS LIST IS ONLY FOR CLIENT-SIDE UI AND MESSAGE STYLING.
-        // !!! SECURITY IS HANDLED BY THE FIREBASE RULES REFERENCING THE DATABASE LIST.
+        
+        // 3. Admin Setup (same as before)
         const ADMIN_UIDS = [
             "5iVnNfREQzZ7kA9NxWJlLTG5zq53", 
             "YOUR_ADMIN_UID_2_FOR_CLIENT_UI"
@@ -225,52 +267,51 @@
 
         let isAdmin = false;
         let currentUser = null;
-
-        // 4. UI Elements
+        let isBanMode = false; // NEW: State for Ban by Message
+        
+        // 4. UI Elements (NEW: Management Panel and Chat Content)
         const signInButton = document.getElementById('sign-in-button');
         const registerButton = document.getElementById('register-button');
         const signOutButton = document.getElementById('sign-out-button');
         const messageForm = document.getElementById('message-form');
-        const messageInput = document.getElementById('message-input');
         const messagesList = document.getElementById('messages');
         const userDisplay = document.getElementById('user-display');
         const adminControls = document.getElementById('admin-controls');
         const lockChatButton = document.getElementById('lock-chat-button');
         const disableChatButton = document.getElementById('disable-chat-button');
         const banUserButton = document.getElementById('ban-user-button');
+        const banManagementButton = document.getElementById('ban-management-button'); // NEW
         const adminStatus = document.getElementById('admin-status');
+        const chatContent = document.getElementById('chat-content'); // NEW
+        const managementPanel = document.getElementById('management-panel'); // NEW
+        const managementList = document.getElementById('management-list'); // NEW
         
-        // Email/Password Inputs
+        // Email/Password Inputs (same as before)
         const emailInput = document.getElementById('email-input');
         const passwordInput = document.getElementById('password-input');
         const displayNameInput = document.getElementById('display-name-input');
         const authError = document.getElementById('auth-error');
 
-
-        // Helper to display authentication errors
+        // Helper (same as before)
         const displayError = (message) => {
             authError.textContent = message;
         }
 
-        // 5. Authentication Functions (Email/Password)
+        // 5. Authentication Functions (same as before)
+        // ... (signInButton, registerButton, signOutButton listeners are unchanged) ...
+
         registerButton.addEventListener('click', async () => {
             const email = emailInput.value;
             const password = passwordInput.value;
             const displayName = displayNameInput.value;
             displayError('');
-
             if (!email || !password || !displayName) {
                 displayError("Email, password, and display name are required for registration.");
                 return;
             }
-
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                
-                // Set the user's display name immediately after registration
                 await updateProfile(userCredential.user, { displayName: displayName });
-
-                // Success is handled by onAuthStateChanged
             } catch (error) {
                 displayError(`Registration Failed: ${error.message}`);
             }
@@ -280,15 +321,12 @@
             const email = emailInput.value;
             const password = passwordInput.value;
             displayError('');
-
             if (!email || !password) {
                 displayError("Email and password are required for sign in.");
                 return;
             }
-
             try {
                 await signInWithEmailAndPassword(auth, email, password);
-                // Success is handled by onAuthStateChanged
             } catch (error) {
                 displayError(`Sign In Failed: ${error.message}`);
             }
@@ -296,16 +334,17 @@
 
         signOutButton.addEventListener('click', () => {
             signOut(auth).catch((error) => console.error("Sign Out Error:", error));
+            // Hide ban management panel on sign out
+            managementPanel.classList.add('hidden');
         });
 
-        // 6. Real-time Authentication State Listener
+
+        // 6. Real-time Authentication State Listener (Unchanged)
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
-            displayError(''); // Clear any previous auth errors
+            displayError('');
 
             if (user) {
-                // User is signed in
-                // isAdmin check still uses the JS array for immediate UI control
                 isAdmin = ADMIN_UIDS.includes(user.uid); 
                 const userName = user.displayName || user.email.split('@')[0]; 
                 userDisplay.textContent = `Welcome, ${userName}.`;
@@ -323,11 +362,9 @@
                     adminControls.classList.add('hidden');
                 }
 
-                // Initial check for chat state and ban status
                 checkChatStateAndBan();
 
             } else {
-                // User is signed out
                 userDisplay.textContent = "Sign in or register to chat.";
 
                 emailInput.classList.remove('hidden');
@@ -337,8 +374,11 @@
                 registerButton.classList.remove('hidden');
                 signOutButton.classList.add('hidden');
                 
+                // Hide ALL chat elements and management panel
+                chatContent.classList.add('hidden'); 
                 messageForm.classList.add('hidden');
                 adminControls.classList.add('hidden');
+                managementPanel.classList.add('hidden');
                 isAdmin = false;
             }
         });
@@ -351,13 +391,16 @@
         const checkChatStateAndBan = () => {
             if (!currentUser) return;
 
-            // Check if user is banned (Reads from adminConfig/bannedUsers)
+            // Check ban status (Unchanged)
             onValue(ref(database, `adminConfig/bannedUsers/${currentUser.uid}`), (snapshot) => {
-                if (snapshot.exists() && snapshot.val() === true) {
+                const isBanned = snapshot.exists() && snapshot.val() === true;
+                
+                if (isBanned) {
                     userDisplay.textContent = `⛔ You have been banned from this chat.`;
                     messageForm.classList.add('hidden');
+                    chatContent.classList.add('hidden'); // Hide chat content if banned
                 } else {
-                    // Check chat lock/disable status (Reads from adminConfig/config)
+                    // Check chat lock/disable status
                     onValue(configRef, (snapshot) => {
                         const config = snapshot.val() || {};
                         isChatLocked = config.locked || false;
@@ -369,56 +412,156 @@
                             disableChatButton.textContent = isChatDisabled ? 'Enable Chat' : 'Disable Chat';
                             let statusText = `Locked: ${isChatLocked ? 'Yes' : 'No'} | Disabled: ${isChatDisabled ? 'Yes' : 'No'}`;
                             adminStatus.textContent = statusText;
+                            
+                            // Admins always see chat content, even if disabled/locked
+                            chatContent.classList.remove('hidden'); 
                             messageForm.classList.remove('hidden');
                             return;
                         }
 
                         // Regular user access
-                        if (isChatLocked) {
-                            userDisplay.textContent = "Chat is currently LOCKED by an admin.";
-                            messageForm.classList.add('hidden');
-                        } else if (isChatDisabled) {
+                        if (isChatDisabled) {
                             userDisplay.textContent = "Chat has been DISABLED by an admin.";
+                            chatContent.classList.add('hidden'); // HIDE ENTIRE CHAT
+                            messageForm.classList.add('hidden');
+                        } else if (isChatLocked) {
+                            userDisplay.textContent = "Chat is currently LOCKED by an admin.";
+                            chatContent.classList.remove('hidden'); 
                             messageForm.classList.add('hidden');
                         } else {
                             const userName = currentUser.displayName || currentUser.email.split('@')[0];
                             userDisplay.textContent = `Welcome, ${userName}.`;
+                            chatContent.classList.remove('hidden'); 
                             messageForm.classList.remove('hidden');
                         }
                     }, { onlyOnce: false });
                 }
-            }, { onlyOnce: false }); // Listen for real-time ban changes
+            }, { onlyOnce: false });
         };
         
-        // Admin Controls Event Handlers (Updated paths to adminConfig)
-        lockChatButton.addEventListener('click', () => {
-            if (isAdmin) {
-                const newLockState = !isChatLocked;
-                update(configRef, { locked: newLockState });
+        // NEW: Toggle Ban Mode
+        const toggleBanMode = () => {
+            if (!isAdmin) return;
+
+            isBanMode = !isBanMode;
+            banUserButton.textContent = isBanMode ? 'Exit Ban Mode' : 'Ban By Message';
+            banUserButton.classList.toggle('ban-mode-active', isBanMode);
+
+            // Toggle visibility of ban icons on all messages
+            document.querySelectorAll('.ban-icon').forEach(icon => {
+                icon.style.opacity = isBanMode ? 1 : 0;
+            });
+        };
+
+        // NEW: Ban User from Message Click
+        const handleBanMessageClick = (e) => {
+            if (!isAdmin || !isBanMode) return;
+
+            const icon = e.target.closest('.ban-icon');
+            if (!icon) return;
+
+            const uidToBan = icon.dataset.uid;
+            const userName = icon.dataset.name;
+
+            if (confirm(`Are you sure you want to ban ${userName} (UID: ${uidToBan})?`)) {
+                update(ref(database, `adminConfig/bannedUsers/${uidToBan}`), { isBanned: true })
+                    .then(() => {
+                        alert(`User ${userName} has been banned.`);
+                        toggleBanMode(); // Exit ban mode after ban
+                    })
+                    .catch(error => console.error("Ban Error:", error));
             }
+        };
+
+        // NEW: Show Ban Management Screen
+        const showBanManagement = () => {
+            if (!isAdmin) return;
+
+            // Toggle views
+            chatContent.classList.add('hidden');
+            managementPanel.classList.remove('hidden');
+            managementList.innerHTML = '<li>Loading banned users...</li>';
+            
+            // Fetch Banned Users
+            onValue(bannedRef, (snapshot) => {
+                managementList.innerHTML = '';
+                const bannedUsers = snapshot.val();
+                
+                if (!bannedUsers || Object.keys(bannedUsers).length === 0) {
+                    managementList.innerHTML = '<li>No users are currently banned.</li>';
+                    return;
+                }
+
+                // Temporary list to hold UID->Email/DisplayName mappings
+                const uidsToFetch = Object.keys(bannedUsers).filter(uid => bannedUsers[uid] === true);
+
+                if (uidsToFetch.length === 0) {
+                    managementList.innerHTML = '<li>No users are currently banned.</li>';
+                    return;
+                }
+                
+                // NOTE: Fetching email/display name for a list of UIDs is complex without a secure backend API.
+                // We will display UID and a placeholder, as Firebase Auth data is not directly queryable in the DB rules.
+                
+                uidsToFetch.forEach(uid => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <span>
+                            <strong>UID:</strong> ${uid} <br>
+                            <strong>Status:</strong> Banned 
+                        </span>
+                        <button class="unban-btn" data-uid="${uid}">Unban</button>
+                    `;
+                    managementList.appendChild(li);
+                });
+            }, { onlyOnce: true });
+        };
+
+        // NEW: Ban Management List Click Listener (for Unban)
+        managementList.addEventListener('click', (e) => {
+            if (!isAdmin || !e.target.classList.contains('unban-btn')) return;
+
+            const uidToUnban = e.target.dataset.uid;
+            
+            if (confirm(`Are you sure you want to UNBAN UID: ${uidToUnban}?`)) {
+                 // Remove the entry from the database to unban
+                remove(ref(database, `adminConfig/bannedUsers/${uidToUnban}`))
+                    .then(() => {
+                        alert(`User ${uidToUnban} unbanned.`);
+                        showBanManagement(); // Refresh the list
+                    })
+                    .catch(error => console.error("Unban Error:", error));
+            }
+        });
+
+
+        // Admin Controls Event Handlers (Updated for new features)
+        lockChatButton.addEventListener('click', () => {
+            if (isAdmin) { update(configRef, { locked: !isChatLocked }); }
         });
 
         disableChatButton.addEventListener('click', () => {
-             if (isAdmin) {
-                const newDisableState = !isChatDisabled;
-                update(configRef, { disabled: newDisableState });
-            }
+             if (isAdmin) { update(configRef, { disabled: !isChatDisabled }); }
         });
 
         banUserButton.addEventListener('click', () => {
-             if (isAdmin) {
-                const uidToBan = prompt("Enter the User ID (UID) to ban:");
-                if (uidToBan) {
-                    // Ban is set under adminConfig/bannedUsers/UID
-                    update(ref(database, `adminConfig/bannedUsers/${uidToBan}`), { isBanned: true })
-                        .then(() => alert(`User ${uidToBan} banned.`));
-                }
-            }
+             toggleBanMode();
+             // Ensure management panel is hidden when starting ban mode
+             managementPanel.classList.add('hidden');
         });
 
-        // Message Sending
+        banManagementButton.addEventListener('click', () => {
+            // Hide the chat content and show the management panel
+            showBanManagement();
+            // Exit ban mode if active
+            if (isBanMode) toggleBanMode(); 
+        });
+
+
+        // Message Sending (Unchanged)
         messageForm.addEventListener('submit', function(e) {
             e.preventDefault();
+            // ... (message sending logic remains the same) ...
 
             if (!currentUser || (isChatLocked && !isAdmin) || (isChatDisabled && !isAdmin)) {
                 alert("You cannot send messages right now.");
@@ -440,19 +583,39 @@
             }
         });
 
-        // Message Receiving
+        // Message Receiving (Updated to include ban icon)
+        messagesList.addEventListener('click', handleBanMessageClick); // NEW listener for the list
+
         onChildAdded(messagesRef, (snapshot) => {
             const data = snapshot.val();
             const messageElement = document.createElement('li');
 
             const isSenderAdmin = ADMIN_UIDS.includes(data.uid);
+            
+            // Build the core message content
+            const messageContent = document.createElement('span');
+            messageContent.innerHTML = `<strong>${data.name}:</strong> ${data.text}`;
+            messageElement.appendChild(messageContent);
+
+            // Add Ban Icon
+            const banIcon = document.createElement('span');
+            banIcon.classList.add('ban-icon');
+            banIcon.textContent = '+';
+            banIcon.dataset.uid = data.uid;
+            banIcon.dataset.name = data.name;
+            
+            // Set opacity based on current ban mode state
+            if (isAdmin && isBanMode) {
+                banIcon.style.opacity = 1;
+            }
+            
+            messageElement.appendChild(banIcon);
+
             if (isSenderAdmin) {
                  messageElement.style.backgroundColor = '#f8d7da';
                  messageElement.style.color = '#721c24';
             }
 
-            messageElement.innerHTML = `<strong>${data.name}:</strong> ${data.text}`;
-            
             messagesList.appendChild(messageElement);
 
             messagesList.scrollTop = messagesList.scrollHeight;
