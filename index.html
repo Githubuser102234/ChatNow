@@ -48,7 +48,7 @@
     <!-- Main Chat Container -->
     <div id="chat-container" class="bg-white rounded-2xl shadow-xl w-full max-w-5xl h-[90vh] flex flex-col md:flex-row overflow-hidden">
 
-        <!-- Sidebar for Auth and Admin Controls (Hidden on mobile by default) -->
+        <!-- Sidebar for Auth and Admin Controls -->
         <div id="sidebar" class="md:w-1/3 w-full bg-gray-50 p-6 border-r border-gray-200 flex flex-col transition-all duration-300">
             <h2 class="text-2xl font-extrabold text-blue-600 mb-4 flex items-center">
                 <i data-lucide="message-square-text" class="w-6 h-6 mr-2"></i> Super Chat
@@ -56,7 +56,7 @@
             
             <!-- Auth Panel -->
             <div id="auth-panel" class="mb-6 pb-4 border-b border-gray-200">
-                <p id="user-display" class="text-gray-700 font-semibold mb-3"></p>
+                <p id="user-display" class="text-gray-700 font-semibold mb-3">Sign in or register to chat.</p>
                 <div id="auth-inputs">
                     <input type="email" id="email-input" placeholder="Email" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                     <input type="password" id="password-input" placeholder="Password" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
@@ -93,12 +93,14 @@
                 <button id="back-to-chat-btn" class="w-full mt-4 p-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium">Back to Chat</button>
             </div>
 
-            <!-- Mock Active User List -->
+            <!-- Active User List (Functional) -->
             <div id="user-list" class="mt-auto pt-4 border-t border-gray-200">
                 <h3 class="font-bold text-gray-800 mb-2 flex items-center">
-                    <i data-lucide="users" class="w-5 h-5 mr-1"></i> Active Users (Mock)
+                    <i data-lucide="users" class="w-5 h-5 mr-1"></i> Active Users (<span id="active-user-count">0</span>)
                 </h3>
-                <ul id="active-users-list" class="text-sm space-y-1 text-gray-600"></ul>
+                <ul id="active-users-list" class="text-sm space-y-1 text-gray-600 overflow-y-auto max-h-32">
+                    <li class="text-gray-400">Sign in to load active users...</li>
+                </ul>
             </div>
             
             <!-- Mobile Toggle Button (Hidden on desktop) -->
@@ -140,7 +142,7 @@
     <script type="module">
         // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js";
-        import { getDatabase, ref, push, onChildAdded, update, onValue, remove, get } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-database.js";
+        import { getDatabase, ref, push, onChildAdded, onChildRemoved, onValue, set, remove, get, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-database.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-auth.js";
         
         // --- 1. CONFIGURATION & INITIALIZATION ---
@@ -166,7 +168,7 @@
         const messagesRef = ref(db, 'messages');
         const configRef = ref(db, 'adminConfig/config');
         const bannedRef = ref(db, 'adminConfig/bannedUsers');
-        const adminUidsRef = ref(db, 'adminConfig/adminUids');
+        const activeUsersRef = ref(db, 'activeUsers'); // NEW: Active Users reference
         
         // State Variables
         let isAdmin = false;
@@ -184,9 +186,6 @@
             sidebar: document.getElementById('sidebar'),
             chatOverlay: document.getElementById('chat-overlay'),
             overlayText: document.getElementById('overlay-text'),
-            authPanel: document.getElementById('auth-panel'),
-            adminControls: document.getElementById('admin-controls'),
-            managementPanel: document.getElementById('management-panel'),
             
             // Inputs & Forms
             emailInput: document.getElementById('email-input'),
@@ -209,10 +208,13 @@
 
             // Lists & Displays
             userDisplay: document.getElementById('user-display'),
+            adminControls: document.getElementById('admin-controls'),
+            managementPanel: document.getElementById('management-panel'),
             adminStatus: document.getElementById('admin-status'),
             messagesList: document.getElementById('messages'),
             managementList: document.getElementById('management-list'),
             activeUsersList: document.getElementById('active-users-list'),
+            activeUserCount: document.getElementById('active-user-count'),
         };
 
         // Custom Modal Logic (Replaces alert/confirm)
@@ -264,13 +266,16 @@
             if (seconds < 60) return `${seconds}s ago`;
             if (minutes < 60) return `${minutes}m ago`;
             if (hours < 24) return `${hours}h ago`;
-            return `${days}d ago`;
+            
+            // Fallback to local time string if older than 24 hours
+            const date = new Date(timestamp);
+            return date.toLocaleDateString();
         };
         
         const displayError = (message) => { ui.authError.textContent = message; };
 
         // Toggle sidebar for mobile view
-        let isSidebarOpen = true; // Start open on mobile for sign-in
+        let isSidebarOpen = false; // Start closed on mobile for initial clean look
         const toggleSidebar = () => {
             isSidebarOpen = !isSidebarOpen;
             if (isSidebarOpen) {
@@ -282,14 +287,17 @@
             }
             lucide.createIcons(); // Re-render icons after DOM manipulation
         };
+        
         // Initial mobile setup
         if (window.innerWidth < 768) {
-            toggleSidebar(); // Close sidebar initially
+            ui.sidebar.classList.add('hidden'); 
             ui.sidebarToggle.classList.remove('hidden');
+        } else {
+            isSidebarOpen = true; // Always open on desktop
         }
         ui.sidebarToggle.addEventListener('click', toggleSidebar);
         
-        // --- 3. AUTHENTICATION ---
+        // --- 3. AUTHENTICATION & PRESENCE ---
 
         ui.registerButton.addEventListener('click', async () => {
             const email = ui.emailInput.value;
@@ -326,9 +334,30 @@
         });
 
         ui.signOutButton.addEventListener('click', () => {
+            // Manually remove presence marker before signing out
+            if(currentUser) {
+                 remove(ref(db, 'activeUsers/' + currentUser.uid));
+            }
             signOut(auth).catch((error) => console.error("Sign Out Error:", error));
         });
+        
+        // Setup user presence tracking (RTDB only, Firestore is not used here)
+        const setupPresence = (user) => {
+            if (!user) return;
+            const userStatusRef = ref(db, 'activeUsers/' + user.uid);
+            const userName = user.displayName || user.email.split('@')[0];
+            
+            // When connection closes, delete this user's presence node
+            userStatusRef.onDisconnect().remove();
+            
+            // Set user status to online
+            set(userStatusRef, { 
+                name: userName, 
+                lastSeen: serverTimestamp() 
+            });
+        };
 
+        // Main Auth State Listener
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
             displayError('');
@@ -352,6 +381,9 @@
                 if (isAdmin) {
                     ui.adminControls.classList.remove('hidden');
                 }
+                
+                // Initialize presence for the new user
+                setupPresence(user);
 
                 // Check initial chat state and ban status
                 checkChatStateAndBanStatus();
@@ -360,6 +392,7 @@
                 ui.userDisplay.textContent = "Sign in or register to chat.";
                 document.getElementById('auth-inputs').classList.remove('hidden');
                 ui.signOutButton.classList.add('hidden');
+                isAdmin = false;
             }
         });
         
@@ -449,8 +482,11 @@
             );
             
             if (confirmed) {
-                update(ref(db, `adminConfig/bannedUsers/${uidToBan}`), { [uidToBan]: true })
+                // Set the ban status in the bannedUsers node
+                set(ref(db, `adminConfig/bannedUsers/${uidToBan}`), true)
                     .then(() => {
+                        // Manually remove the user from active list if they are currently online
+                        remove(ref(db, 'activeUsers/' + uidToBan)); 
                         showCustomModal('Success', `${userName} has been banned.`, 'OK');
                         if (isBanMode) toggleBanMode(); // Exit ban mode after ban
                     })
@@ -466,10 +502,8 @@
             );
             
             if (confirmed) {
+                // Deletion handled by onChildRemoved listener
                 remove(ref(db, `messages/${messageId}`))
-                    .then(() => {
-                        // The onChildRemoved listener handles the UI update
-                    })
                     .catch(error => showCustomModal('Error', `Deletion Error: ${error.message}`, 'Close'));
             }
         }
@@ -607,18 +641,21 @@
                     uid: currentUser.uid,
                     name: userName,
                     text: message,
-                    timestamp: Date.now()
+                    timestamp: Date.now() // Using client timestamp is fine for display
                 });
                 ui.messageInput.value = '';
             }
         });
 
-        // Message Receiving (onChildAdded)
+        // Message ADDITION (Fixes the one-message bug)
         onChildAdded(messagesRef, (snapshot) => {
             const data = snapshot.val();
             const messageId = snapshot.key;
             const isSenderAdmin = ADMIN_UIDS.includes(data.uid);
 
+            // Check if element already exists (to prevent duplicates on re-auth/re-connect)
+            if (document.getElementById(`message-${messageId}`)) return; 
+            
             const li = document.createElement('li');
             li.id = `message-${messageId}`;
             li.className = `message-item flex justify-between items-start p-3 rounded-xl shadow-md transition-all duration-300 ${
@@ -653,12 +690,12 @@
                 const actionsDiv = document.createElement('div');
                 actionsDiv.className = `admin-actions flex space-x-2 ml-3 items-center flex-shrink-0 ${isBanMode ? 'opacity-100' : 'opacity-0'}`;
                 
-                // Ban Icon (Only visible in Ban Mode)
+                // Ban Icon (Only clickable in Ban Mode)
                 const banIcon = `<button class="admin-action-icon ban-icon text-red-500 hover:text-red-700 p-1 rounded-full bg-red-100 transition" data-uid="${data.uid}" data-name="${data.name}" data-message-id="${messageId}" title="Ban User">
                     <i data-lucide="user-x" class="w-4 h-4"></i>
                 </button>`;
                 
-                // Delete Icon (Always visible for Admins on hover)
+                // Delete Icon (Always visible on hover for Admins)
                 const deleteIcon = `<button class="admin-action-icon delete-icon text-gray-500 hover:text-gray-700 p-1 rounded-full bg-gray-100 transition" data-message-id="${messageId}" title="Delete Message">
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                 </button>`;
@@ -672,20 +709,13 @@
             lucide.createIcons(); // Render icons
         });
 
-        // Message Deletion (onChildRemoved)
-        onValue(messagesRef, (snapshot) => {
-            const currentMessageIds = new Set();
-            snapshot.forEach(child => currentMessageIds.add(child.key));
-            
-            // Get all message elements currently in the DOM
-            const allListItems = ui.messagesList.querySelectorAll('li[id^="message-"]');
-
-            allListItems.forEach(li => {
-                const messageId = li.id.replace('message-', '');
-                if (!currentMessageIds.has(messageId)) {
-                    li.remove(); // Remove element if it no longer exists in DB
-                }
-            });
+        // Message REMOVAL (Correct way to handle deletion)
+        onChildRemoved(messagesRef, (snapshot) => {
+            const messageId = snapshot.key;
+            const element = document.getElementById(`message-${messageId}`);
+            if (element) {
+                element.remove();
+            }
         });
 
         // Update timestamps every minute
@@ -696,23 +726,41 @@
             });
         }, 60000); // 1 minute
         
-        // Mock User List update (to show in the sidebar)
-        const updateMockUsers = () => {
-            ui.activeUsersList.innerHTML = `
-                <li class="flex items-center"><i data-lucide="circle" class="w-2 h-2 mr-2 text-green-500 fill-current"></i> You (${currentUser ? (currentUser.displayName || 'Guest') : 'Offline'})</li>
-                <li class="flex items-center"><i data-lucide="circle" class="w-2 h-2 mr-2 text-green-500 fill-current"></i> Admin (Simulated)</li>
-                <li class="flex items-center"><i data-lucide="circle" class="w-2 h-2 mr-2 text-yellow-500 fill-current"></i> JaneDoe</li>
-            `;
-            lucide.createIcons();
-        }
+        // --- 8. ACTIVE USERS (PRESENCE) LOGIC ---
         
-        onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-            if (user) {
-                updateMockUsers();
-            } else {
-                 ui.activeUsersList.innerHTML = '<li class="text-gray-400">Sign in to see users.</li>';
+        onValue(activeUsersRef, (snapshot) => {
+            ui.activeUsersList.innerHTML = '';
+            let userCount = 0;
+            const users = snapshot.val();
+            
+            if (!users) {
+                ui.activeUsersList.innerHTML = '<li class="text-gray-400">No users currently online.</li>';
+                ui.activeUserCount.textContent = '0';
+                return;
             }
+
+            const uids = Object.keys(users);
+            uids.forEach(uid => {
+                const user = users[uid];
+                const isSelf = currentUser && uid === currentUser.uid;
+                const isUserAdmin = ADMIN_UIDS.includes(uid);
+                
+                if (user.name) {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-center text-sm';
+                    li.innerHTML = `
+                        <i data-lucide="circle" class="w-2 h-2 mr-2 ${isSelf ? 'text-blue-500' : 'text-green-500'} fill-current"></i>
+                        <span>${user.name}</span>
+                        ${isUserAdmin ? '<span class="text-xs text-red-500 ml-1 font-semibold">(Admin)</span>' : ''}
+                        ${isSelf ? '<span class="text-xs text-gray-400 ml-1">(You)</span>' : ''}
+                    `;
+                    ui.activeUsersList.appendChild(li);
+                    userCount++;
+                }
+            });
+
+            ui.activeUserCount.textContent = userCount.toString();
+            lucide.createIcons();
         });
 
     </script>
