@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Firebase Chat</title>
+    <title>Chat 💬</title>
     <style>
         /* General Styles (from previous "fancy" version, adjusted) */
         body {
@@ -38,13 +38,22 @@
         }
 
         /* Authentication and Admin Panels */
-        #auth-panel, #admin-controls {
+        #auth-panel {
             padding: 15px;
             text-align: center;
             border-bottom: 1px solid #eee;
         }
 
-        #sign-in-button, #sign-out-button, .admin-button {
+        #auth-panel input {
+            display: block;
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin: 8px auto;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        #auth-panel button {
             padding: 10px 15px;
             border: none;
             border-radius: 20px;
@@ -52,9 +61,14 @@
             margin: 5px;
             font-weight: 500;
         }
+        
+        #register-button {
+            background-color: #007bff;
+            color: white;
+        }
 
         #sign-in-button {
-            background-color: #4285F4; /* Google Blue */
+            background-color: #28a745; 
             color: white;
         }
 
@@ -66,9 +80,16 @@
         .admin-button {
             background-color: #ffc107;
             color: black;
+            margin: 5px;
+        }
+        
+        #admin-controls {
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
         }
 
-        /* Message Area */
+        /* Message Area and Form (Unchanged) */
         #messages {
             list-style: none;
             padding: 15px;
@@ -84,7 +105,7 @@
             max-width: 90%;
             line-height: 1.4;
             word-wrap: break-word;
-            background-color: #e9ecef; /* Default bubble color */
+            background-color: #e9ecef;
         }
         
         #messages li strong {
@@ -93,7 +114,6 @@
             margin-right: 5px;
         }
 
-        /* Form */
         #message-form {
             display: flex;
             padding: 15px;
@@ -127,12 +147,19 @@
 <body>
 
     <div id="chat-container">
-        <h1>Admin Chat 🛡️</h1>
+        <h1>Chat 💬</h1>
 
         <div id="auth-panel">
-            <span id="user-display">Please sign in to chat.</span>
-            <button id="sign-in-button">Sign In with Google</button>
+            <span id="user-display">Sign in or register to chat.</span>
+            
+            <input type="email" id="email-input" placeholder="Email" required>
+            <input type="password" id="password-input" placeholder="Password" required>
+            <input type="text" id="display-name-input" placeholder="Display Name (for registration)">
+
+            <button id="sign-in-button">Sign In</button>
+            <button id="register-button">Register</button>
             <button id="sign-out-button" class="hidden">Sign Out</button>
+            <div id="auth-error" style="color: red; margin-top: 10px;"></div>
         </div>
         
         <div id="admin-controls" class="hidden">
@@ -155,10 +182,16 @@
         // 1. Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
         import { getDatabase, ref, push, onChildAdded, update, onValue } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+        import { 
+            getAuth, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            signOut, 
+            onAuthStateChanged,
+            updateProfile
+        } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
         
         // 2. Configuration & Initialization
-        // Use the config provided by the user
         const firebaseConfig = {
             apiKey: "AIzaSyBSgqIz2e8ClflpJV6X5xFKp6dB_nf-7os",
             authDomain: "chatnow-3ed74.firebaseapp.com",
@@ -176,14 +209,14 @@
 
         // Firebase References
         const messagesRef = ref(database, 'messages');
-        const configRef = ref(database, 'config'); // For admin settings
-        const bannedRef = ref(database, 'bannedUsers'); // For user bans
+        const configRef = ref(database, 'config');
+        const bannedRef = ref(database, 'bannedUsers');
 
         // 3. Admin Setup
         // !!! IMPORTANT: ADD THE UIDs OF YOUR ADMIN ACCOUNTS HERE !!!
         const ADMIN_UIDS = [
-            "ADMIN_UID_1_FROM_FIREBASE_CONSOLE", // Example UID
-            "ADMIN_UID_2_FROM_FIREBASE_CONSOLE"  // Example UID
+            "ADMIN_UID_1_FROM_FIREBASE_CONSOLE", 
+            "ADMIN_UID_2_FROM_FIREBASE_CONSOLE"
         ];
 
         let isAdmin = false;
@@ -191,6 +224,7 @@
 
         // 4. UI Elements
         const signInButton = document.getElementById('sign-in-button');
+        const registerButton = document.getElementById('register-button');
         const signOutButton = document.getElementById('sign-out-button');
         const messageForm = document.getElementById('message-form');
         const messageInput = document.getElementById('message-input');
@@ -201,13 +235,59 @@
         const disableChatButton = document.getElementById('disable-chat-button');
         const banUserButton = document.getElementById('ban-user-button');
         const adminStatus = document.getElementById('admin-status');
+        
+        // Email/Password Inputs
+        const emailInput = document.getElementById('email-input');
+        const passwordInput = document.getElementById('password-input');
+        const displayNameInput = document.getElementById('display-name-input');
+        const authError = document.getElementById('auth-error');
 
 
-        // 5. Authentication Functions
-        const provider = new GoogleAuthProvider();
+        // Helper to display authentication errors
+        const displayError = (message) => {
+            authError.textContent = message;
+        }
 
-        signInButton.addEventListener('click', () => {
-            signInWithPopup(auth, provider).catch((error) => console.error("Sign In Error:", error));
+        // 5. Authentication Functions (Email/Password)
+        registerButton.addEventListener('click', async () => {
+            const email = emailInput.value;
+            const password = passwordInput.value;
+            const displayName = displayNameInput.value;
+            displayError('');
+
+            if (!email || !password || !displayName) {
+                displayError("Email, password, and display name are required for registration.");
+                return;
+            }
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                
+                // Set the user's display name immediately after registration
+                await updateProfile(userCredential.user, { displayName: displayName });
+
+                // Success is handled by onAuthStateChanged
+            } catch (error) {
+                displayError(`Registration Failed: ${error.message}`);
+            }
+        });
+
+        signInButton.addEventListener('click', async () => {
+            const email = emailInput.value;
+            const password = passwordInput.value;
+            displayError('');
+
+            if (!email || !password) {
+                displayError("Email and password are required for sign in.");
+                return;
+            }
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // Success is handled by onAuthStateChanged
+            } catch (error) {
+                displayError(`Sign In Failed: ${error.message}`);
+            }
         });
 
         signOutButton.addEventListener('click', () => {
@@ -217,11 +297,21 @@
         // 6. Real-time Authentication State Listener
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
+            displayError(''); // Clear any previous auth errors
+
             if (user) {
                 // User is signed in
                 isAdmin = ADMIN_UIDS.includes(user.uid);
-                userDisplay.textContent = `Welcome, ${user.displayName} (${user.email}).`;
+                // Use displayName from profile
+                const userName = user.displayName || user.email.split('@')[0]; 
+                userDisplay.textContent = `Welcome, ${userName}.`;
+
+                // Hide Auth inputs/buttons, show Sign Out
+                emailInput.classList.add('hidden');
+                passwordInput.classList.add('hidden');
+                displayNameInput.classList.add('hidden');
                 signInButton.classList.add('hidden');
+                registerButton.classList.add('hidden');
                 signOutButton.classList.remove('hidden');
 
                 if (isAdmin) {
@@ -235,23 +325,31 @@
 
             } else {
                 // User is signed out
-                userDisplay.textContent = "Please sign in to chat.";
+                userDisplay.textContent = "Sign in or register to chat.";
+
+                // Show Auth inputs/buttons, hide Sign Out
+                emailInput.classList.remove('hidden');
+                passwordInput.classList.remove('hidden');
+                displayNameInput.classList.remove('hidden');
                 signInButton.classList.remove('hidden');
+                registerButton.classList.remove('hidden');
                 signOutButton.classList.add('hidden');
-                messageForm.classList.add('hidden'); // Hide input when logged out
+                
+                messageForm.classList.add('hidden');
                 adminControls.classList.add('hidden');
                 isAdmin = false;
             }
         });
         
-        // 7. Admin and Chat State Logic
+        // --- Admin and Message Logic (Unchanged) ---
+        
         let isChatLocked = false;
         let isChatDisabled = false;
 
         const checkChatStateAndBan = () => {
             if (!currentUser) return;
 
-            // Check if user is banned (requires a read rule on 'bannedUsers')
+            // Check if user is banned 
             onValue(ref(database, `bannedUsers/${currentUser.uid}`), (snapshot) => {
                 if (snapshot.exists()) {
                     userDisplay.textContent = `⛔ You have been banned from this chat.`;
@@ -269,7 +367,7 @@
                             disableChatButton.textContent = isChatDisabled ? 'Enable Chat' : 'Disable Chat';
                             let statusText = `Locked: ${isChatLocked ? 'Yes' : 'No'} | Disabled: ${isChatDisabled ? 'Yes' : 'No'}`;
                             adminStatus.textContent = statusText;
-                            messageForm.classList.remove('hidden'); // Admins can always see the form
+                            messageForm.classList.remove('hidden');
                             return;
                         }
 
@@ -281,30 +379,27 @@
                             userDisplay.textContent = "Chat has been DISABLED by an admin.";
                             messageForm.classList.add('hidden');
                         } else {
-                            userDisplay.textContent = `Welcome, ${currentUser.displayName}.`;
+                            const userName = currentUser.displayName || currentUser.email.split('@')[0];
+                            userDisplay.textContent = `Welcome, ${userName}.`;
                             messageForm.classList.remove('hidden');
                         }
-                    }, { onlyOnce: false }); // Listen for real-time config changes
+                    }, { onlyOnce: false });
                 }
-            }, { onlyOnce: true }); // Only need to check ban status once on sign-in
+            }, { onlyOnce: true });
         };
         
-        // 8. Admin Controls Event Handlers
+        // Admin Controls Event Handlers (Unchanged)
         lockChatButton.addEventListener('click', () => {
             if (isAdmin) {
                 const newLockState = !isChatLocked;
-                update(configRef, { locked: newLockState })
-                    .then(() => console.log(`Chat lock set to: ${newLockState}`))
-                    .catch((error) => console.error("Lock Chat Error:", error));
+                update(configRef, { locked: newLockState });
             }
         });
 
         disableChatButton.addEventListener('click', () => {
              if (isAdmin) {
                 const newDisableState = !isChatDisabled;
-                update(configRef, { disabled: newDisableState })
-                    .then(() => console.log(`Chat disable set to: ${newDisableState}`))
-                    .catch((error) => console.error("Disable Chat Error:", error));
+                update(configRef, { disabled: newDisableState });
             }
         });
 
@@ -313,29 +408,27 @@
                 const uidToBan = prompt("Enter the User ID (UID) to ban:");
                 if (uidToBan) {
                     update(ref(database, `bannedUsers/${uidToBan}`), { isBanned: true })
-                        .then(() => alert(`User ${uidToBan} banned.`))
-                        .catch((error) => console.error("Ban Error:", error));
+                        .then(() => alert(`User ${uidToBan} banned.`));
                 }
             }
         });
 
-        // 9. Message Sending
+        // Message Sending (Adjusted to use currentUser data)
         messageForm.addEventListener('submit', function(e) {
             e.preventDefault();
 
-            // Check if user is logged in, not banned, and chat isn't locked/disabled
             if (!currentUser || (isChatLocked && !isAdmin) || (isChatDisabled && !isAdmin)) {
                 alert("You cannot send messages right now.");
                 return;
             }
             
             const message = messageInput.value.trim();
+            const userName = currentUser.displayName || currentUser.email.split('@')[0]; // Use DisplayName or part of email
 
             if (message) {
-                // Push data to the Realtime Database
                 push(messagesRef, {
                     uid: currentUser.uid,
-                    name: currentUser.displayName,
+                    name: userName,
                     text: message,
                     timestamp: Date.now()
                 });
@@ -344,19 +437,17 @@
             }
         });
 
-        // 10. Message Receiving
+        // Message Receiving (Unchanged)
         onChildAdded(messagesRef, (snapshot) => {
             const data = snapshot.val();
             const messageElement = document.createElement('li');
 
-            // Add a class for admin messages to style them differently (optional)
             const isSenderAdmin = ADMIN_UIDS.includes(data.uid);
             if (isSenderAdmin) {
-                 messageElement.style.backgroundColor = '#f8d7da'; // Light red background for admin messages
-                 messageElement.style.color = '#721c24'; // Dark red text
+                 messageElement.style.backgroundColor = '#f8d7da';
+                 messageElement.style.color = '#721c24';
             }
 
-            // Construct the message content
             messageElement.innerHTML = `<strong>${data.name}:</strong> ${data.text}`;
             
             messagesList.appendChild(messageElement);
