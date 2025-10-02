@@ -209,14 +209,18 @@
 
         // Firebase References
         const messagesRef = ref(database, 'messages');
-        const configRef = ref(database, 'config');
-        const bannedRef = ref(database, 'bannedUsers');
+        // Admin configuration is nested under adminConfig
+        const adminConfigRef = ref(database, 'adminConfig'); 
+        const configRef = ref(database, 'adminConfig/config');
+        const bannedRef = ref(database, 'adminConfig/bannedUsers');
+        const adminUidsRef = ref(database, 'adminConfig/adminUids');
 
         // 3. Admin Setup
-        // !!! IMPORTANT: ADD THE UIDs OF YOUR ADMIN ACCOUNTS HERE !!!
+        // !!! IMPORTANT: THIS LIST IS ONLY FOR CLIENT-SIDE UI AND MESSAGE STYLING.
+        // !!! SECURITY IS HANDLED BY THE FIREBASE RULES REFERENCING THE DATABASE LIST.
         const ADMIN_UIDS = [
             "5iVnNfREQzZ7kA9NxWJlLTG5zq53", 
-            "ADMIN_UID_2_FROM_FIREBASE_CONSOLE"
+            "YOUR_ADMIN_UID_2_FOR_CLIENT_UI"
         ];
 
         let isAdmin = false;
@@ -301,12 +305,11 @@
 
             if (user) {
                 // User is signed in
-                isAdmin = ADMIN_UIDS.includes(user.uid);
-                // Use displayName from profile
+                // isAdmin check still uses the JS array for immediate UI control
+                isAdmin = ADMIN_UIDS.includes(user.uid); 
                 const userName = user.displayName || user.email.split('@')[0]; 
                 userDisplay.textContent = `Welcome, ${userName}.`;
 
-                // Hide Auth inputs/buttons, show Sign Out
                 emailInput.classList.add('hidden');
                 passwordInput.classList.add('hidden');
                 displayNameInput.classList.add('hidden');
@@ -327,7 +330,6 @@
                 // User is signed out
                 userDisplay.textContent = "Sign in or register to chat.";
 
-                // Show Auth inputs/buttons, hide Sign Out
                 emailInput.classList.remove('hidden');
                 passwordInput.classList.remove('hidden');
                 displayNameInput.classList.remove('hidden');
@@ -341,7 +343,7 @@
             }
         });
         
-        // --- Admin and Message Logic (Unchanged) ---
+        // --- Admin and Message Logic ---
         
         let isChatLocked = false;
         let isChatDisabled = false;
@@ -349,13 +351,13 @@
         const checkChatStateAndBan = () => {
             if (!currentUser) return;
 
-            // Check if user is banned 
-            onValue(ref(database, `bannedUsers/${currentUser.uid}`), (snapshot) => {
-                if (snapshot.exists()) {
+            // Check if user is banned (Reads from adminConfig/bannedUsers)
+            onValue(ref(database, `adminConfig/bannedUsers/${currentUser.uid}`), (snapshot) => {
+                if (snapshot.exists() && snapshot.val() === true) {
                     userDisplay.textContent = `⛔ You have been banned from this chat.`;
                     messageForm.classList.add('hidden');
                 } else {
-                    // Check chat lock/disable status
+                    // Check chat lock/disable status (Reads from adminConfig/config)
                     onValue(configRef, (snapshot) => {
                         const config = snapshot.val() || {};
                         isChatLocked = config.locked || false;
@@ -385,10 +387,10 @@
                         }
                     }, { onlyOnce: false });
                 }
-            }, { onlyOnce: true });
+            }, { onlyOnce: false }); // Listen for real-time ban changes
         };
         
-        // Admin Controls Event Handlers (Unchanged)
+        // Admin Controls Event Handlers (Updated paths to adminConfig)
         lockChatButton.addEventListener('click', () => {
             if (isAdmin) {
                 const newLockState = !isChatLocked;
@@ -407,13 +409,14 @@
              if (isAdmin) {
                 const uidToBan = prompt("Enter the User ID (UID) to ban:");
                 if (uidToBan) {
-                    update(ref(database, `bannedUsers/${uidToBan}`), { isBanned: true })
+                    // Ban is set under adminConfig/bannedUsers/UID
+                    update(ref(database, `adminConfig/bannedUsers/${uidToBan}`), { isBanned: true })
                         .then(() => alert(`User ${uidToBan} banned.`));
                 }
             }
         });
 
-        // Message Sending (Adjusted to use currentUser data)
+        // Message Sending
         messageForm.addEventListener('submit', function(e) {
             e.preventDefault();
 
@@ -423,7 +426,7 @@
             }
             
             const message = messageInput.value.trim();
-            const userName = currentUser.displayName || currentUser.email.split('@')[0]; // Use DisplayName or part of email
+            const userName = currentUser.displayName || currentUser.email.split('@')[0];
 
             if (message) {
                 push(messagesRef, {
@@ -437,7 +440,7 @@
             }
         });
 
-        // Message Receiving (Unchanged)
+        // Message Receiving
         onChildAdded(messagesRef, (snapshot) => {
             const data = snapshot.val();
             const messageElement = document.createElement('li');
