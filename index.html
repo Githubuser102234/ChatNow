@@ -36,7 +36,6 @@
             #sidebar.open {
                 transform: translateX(0);
             }
-            /* Ensure the chat area is visible when the sidebar is closed */
             .md\:w-1\/3 { width: 100%; }
         }
     </style>
@@ -180,10 +179,11 @@
         const bannedRef = ref(db, 'adminConfig/bannedUsers');
         const activeUsersRef = ref(db, 'activeUsers');
         
-        // State Variables
+        // State Variables (Refactored for centralized control)
         let isAdmin = false;
         let currentUser = null;
         let isBanMode = false;
+        let isCurrentUserBanned = false; 
         let isChatLocked = false;
         let isChatDisabled = false;
         let isManagementView = false;
@@ -280,7 +280,7 @@
         const displayError = (message) => { ui.authError.textContent = message; };
 
         // Toggle sidebar for mobile view (using CSS classes for transition)
-        let isSidebarOpen = window.innerWidth >= 768; // Start open on desktop, closed on mobile
+        let isSidebarOpen = window.innerWidth >= 768; 
         
         const toggleSidebar = () => {
             isSidebarOpen = !isSidebarOpen;
@@ -294,7 +294,7 @@
             lucide.createIcons();
         };
         
-        // Initial mobile setup - apply classes based on starting state
+        // Initial mobile setup 
         if (window.innerWidth < 768) {
             ui.sidebar.classList.remove('hidden'); 
             ui.sidebarToggle.classList.remove('hidden');
@@ -340,7 +340,6 @@
         });
 
         ui.signOutButton.addEventListener('click', () => {
-            // Manually remove presence marker before signing out
             if(currentUser) {
                  remove(ref(db, 'activeUsers/' + currentUser.uid)).catch(e => console.error("Error removing presence on sign out:", e));
             }
@@ -353,10 +352,8 @@
             const userStatusRef = ref(db, 'activeUsers/' + user.uid);
             const userName = user.displayName || user.email.split('@')[0];
             
-            // When connection closes, delete this user's presence node
             userStatusRef.onDisconnect().remove();
             
-            // Set user status to online
             set(userStatusRef, { 
                 name: userName, 
                 lastSeen: serverTimestamp() 
@@ -369,16 +366,11 @@
             displayError('');
             
             // Reset UI state
-            ui.messageForm.classList.add('hidden');
             ui.adminControls.classList.add('hidden');
-            ui.managementPanel.classList.add('hidden');
-            ui.chatOverlay.classList.add('hidden');
 
             if (user) {
                 isAdmin = ADMIN_UIDS.includes(user.uid); 
-                const userName = user.displayName || user.email.split('@')[0]; 
-                ui.userDisplay.textContent = `Hello, ${userName} ${isAdmin ? '(Admin)' : ''}.`;
-
+                
                 document.getElementById('auth-inputs').classList.add('hidden');
                 ui.signOutButton.classList.remove('hidden');
 
@@ -387,71 +379,91 @@
                 }
                 
                 setupPresence(user);
-                checkChatStateAndBanStatus();
+                // NEW: Set up listeners and trigger the first UI update
+                setupChatStateListeners(); 
 
             } else {
                 ui.userDisplay.textContent = "Sign in or register to chat.";
                 document.getElementById('auth-inputs').classList.remove('hidden');
                 ui.signOutButton.classList.add('hidden');
                 isAdmin = false;
+                
+                // When logging out, immediately hide chat form/overlay
+                ui.messageForm.classList.add('hidden');
+                ui.chatOverlay.classList.add('hidden');
             }
         });
         
-        // --- 4. CHAT STATE & BAN LOGIC ---
+        // --- 4. CHAT STATE & BAN LOGIC (Refactored) ---
 
-        const checkChatStateAndBanStatus = () => {
+        // Sets up persistent listeners for global config and individual ban status
+        const setupChatStateListeners = () => {
             if (!currentUser) return;
-
-            // Listener 1: Check Ban Status
+            
+            // Listener 1: Current User's Ban Status
             onValue(ref(db, `adminConfig/bannedUsers/${currentUser.uid}`), (snapshot) => {
-                const isBanned = snapshot.val() === true;
-                
-                if (isBanned) {
-                    ui.userDisplay.textContent = `⛔ You have been banned from this chat.`;
-                    showChatOverlay("⛔ You have been permanently banned from the chat.");
-                    ui.messageForm.classList.add('hidden');
-                    // Stop further config checks if banned
-                    onValue(configRef, () => {}, { onlyOnce: true }); 
-                } else {
-                    // Listener 2: Check Admin Config (Locked/Disabled) only if not banned
-                    onValue(configRef, (configSnapshot) => {
-                        const config = configSnapshot.val() || {};
-                        // Ensure null values are treated as false/default
-                        isChatLocked = !!config.locked; 
-                        isChatDisabled = !!config.disabled;
-                        
-                        updateChatUI();
-                    }, { onlyOnce: false });
-                }
+                isCurrentUserBanned = snapshot.val() === true;
+                updateChatUI(); // Triggers UI update
+            }, { onlyOnce: false });
+
+            // Listener 2: Global Admin Config (Locked/Disabled)
+            onValue(configRef, (configSnapshot) => {
+                const config = configSnapshot.val() || {};
+                // Ensure null values are treated as false/default
+                isChatLocked = !!config.locked; 
+                isChatDisabled = !!config.disabled;
+                updateChatUI(); // Triggers UI update
             }, { onlyOnce: false });
         };
-        
+
+        // Calculates and applies the correct UI state based on current global variables
         const updateChatUI = () => {
-            // 1. Admin updates
+            if (!currentUser) return;
+
+            // 1. Admin Control Panel Update
             if (isAdmin) {
                 ui.lockChatButton.textContent = isChatLocked ? 'Unlock Chat' : 'Lock Chat';
                 ui.disableChatButton.textContent = isChatDisabled ? 'Enable Chat' : 'Disable Chat';
                 let statusText = `Locked: ${isChatLocked ? 'Yes' : 'No'} | Disabled: ${isChatDisabled ? 'Yes' : 'No'} | Ban Mode: ${isBanMode ? 'Active' : 'Off'}`;
                 ui.adminStatus.textContent = statusText;
-                
-                // Admins always see chat content and input unless in management view
-                if (!isManagementView) {
-                    ui.chatOverlay.classList.add('hidden');
-                    ui.messageForm.classList.remove('hidden');
-                }
+            }
+            
+            // Check if the user is in the Management view (which overrides chat view)
+            if (isManagementView) {
+                ui.chatOverlay.classList.add('hidden');
+                ui.messageForm.classList.add('hidden');
                 return;
             }
 
-            // 2. Regular user access
-            ui.messageForm.classList.remove('hidden');
-            ui.chatOverlay.classList.add('hidden');
-            
-            if (isChatDisabled) {
+            // 2. User/Chat Area Visibility Logic (Prioritized)
+            ui.messageForm.classList.remove('hidden'); // Default to showing
+            ui.chatOverlay.classList.add('hidden');    // Default to hiding overlay
+            ui.userDisplay.classList.remove('text-red-600'); // Reset potential ban text color
+
+            if (isCurrentUserBanned) {
+                // Highest priority block: Ban
+                ui.userDisplay.textContent = `⛔ You have been banned from this chat.`;
+                ui.userDisplay.classList.add('text-red-600');
+                showChatOverlay("⛔ You have been permanently banned from the chat.");
+                ui.messageForm.classList.add('hidden');
+            } else if (isChatDisabled) {
+                // Second highest priority block: Disabled
                 showChatOverlay("Chat is currently DISABLED by an administrator.");
                 ui.messageForm.classList.add('hidden');
             } else if (isChatLocked) {
+                // Third priority block: Locked (Read-only)
                 showChatOverlay("Chat is currently LOCKED by an administrator (read-only).");
                 ui.messageForm.classList.add('hidden');
+            } else {
+                // Chat is open
+                const userName = currentUser.displayName || currentUser.email.split('@')[0]; 
+                ui.userDisplay.textContent = `Hello, ${userName} ${isAdmin ? '(Admin)' : ''}.`;
+            }
+
+            // Admin Override: Admins can always chat regardless of lock/disable state
+            if (isAdmin && !isCurrentUserBanned) {
+                ui.chatOverlay.classList.add('hidden');
+                ui.messageForm.classList.remove('hidden');
             }
         }
         
@@ -471,7 +483,6 @@
             ui.banUserButton.classList.toggle('bg-purple-500', !isBanMode);
             ui.banUserButton.classList.toggle('hover:bg-purple-600', !isBanMode);
 
-            // Toggle visibility of ban icons on all messages
             document.querySelectorAll('.admin-actions').forEach(actions => {
                 actions.classList.toggle('opacity-100', isBanMode);
             });
@@ -488,6 +499,7 @@
             if (confirmed) {
                 set(ref(db, `adminConfig/bannedUsers/${uidToBan}`), true)
                     .then(() => {
+                        // Crucial: Remove presence record immediately to force user offline
                         remove(ref(db, 'activeUsers/' + uidToBan)).catch(e => console.error("Error removing presence:", e)); 
                         showCustomModal('Success', `${userName} has been banned.`, 'OK');
                         if (isBanMode) toggleBanMode(); 
@@ -509,7 +521,6 @@
             }
         }
         
-        // Listener for ban/delete actions on the message list
         ui.messagesList.addEventListener('click', (e) => {
             if (!isAdmin || isManagementView) return;
 
@@ -547,16 +558,18 @@
             
             if (isManagementView) {
                 ui.managementPanel.classList.remove('hidden');
-                ui.messageForm.classList.add('hidden');
                 ui.messagesList.classList.add('hidden');
-                ui.chatOverlay.classList.add('hidden');
                 ui.adminControls.classList.add('hidden');
+                // Ensure chat controls are correctly hidden/overlayed when switching to management
+                ui.messageForm.classList.add('hidden');
+                ui.chatOverlay.classList.add('hidden'); 
+
                 loadBannedUsers();
             } else {
                 ui.managementPanel.classList.add('hidden');
                 ui.messagesList.classList.remove('hidden');
                 ui.adminControls.classList.remove('hidden');
-                updateChatUI(); 
+                updateChatUI(); // Recalculate chat UI based on current state (now visible)
             }
             if (isBanMode) toggleBanMode(); 
         };
@@ -627,7 +640,8 @@
         ui.messageForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            if (!currentUser || isChatDisabled || (isChatLocked && !isAdmin)) {
+            // Re-check state before sending (final client-side sanity check)
+            if (!currentUser || isCurrentUserBanned || isChatDisabled || (isChatLocked && !isAdmin)) {
                 showCustomModal('Access Denied', 'You cannot send messages right now.', 'Close');
                 return;
             }
@@ -671,7 +685,7 @@
             header.innerHTML = `
                 <strong class="font-bold ${isSenderAdmin ? 'text-red-700' : 'text-blue-600'}">${data.name}</strong>
                 ${isSenderAdmin ? '<span class="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-semibold">ADMIN</span>' : ''}
-                <span class="text-xs text-gray-400 ml-auto" data-timestamp="${data.timestamp}">${formatTime(data.timestamp)}</span>
+                <span class="text-xs text-gray-400 ml-auto" data-timestamp="${data.timestamp}"></span>
             `;
             
             // Message Text
@@ -686,15 +700,12 @@
             // Admin Actions (Ban/Delete)
             if (currentUser && isAdmin) {
                 const actionsDiv = document.createElement('div');
-                // Use isBanMode to control initial visibility based on current state
                 actionsDiv.className = `admin-actions flex space-x-2 ml-3 items-center flex-shrink-0 ${isBanMode ? 'opacity-100' : 'opacity-0'}`;
                 
-                // Ban Icon
                 const banIcon = `<button class="admin-action-icon ban-icon text-red-500 hover:text-red-700 p-1 rounded-full bg-red-100 transition" data-uid="${data.uid}" data-name="${data.name}" data-message-id="${messageId}" title="Ban User">
                     <i data-lucide="user-x" class="w-4 h-4"></i>
                 </button>`;
                 
-                // Delete Icon
                 const deleteIcon = `<button class="admin-action-icon delete-icon text-gray-500 hover:text-gray-700 p-1 rounded-full bg-gray-100 transition" data-message-id="${messageId}" title="Delete Message">
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                 </button>`;
@@ -704,8 +715,10 @@
             }
 
             ui.messagesList.appendChild(li);
+            // Manually set timestamp on addition
+            li.querySelector('[data-timestamp]').textContent = formatTime(data.timestamp);
             ui.messagesList.scrollTop = ui.messagesList.scrollHeight;
-            lucide.createIcons(); // Render icons
+            lucide.createIcons(); 
         });
 
         // Message REMOVAL
